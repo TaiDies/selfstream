@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'core/api.dart';
 import 'platform/platform.dart';
+import 'platform/title_bar.dart';
 import 'state/desktop_window.dart';
 import 'state/caps_holder.dart';
 import 'state/library.dart';
@@ -15,6 +16,7 @@ import 'state/player.dart';
 import 'state/session.dart';
 import 'state/settings.dart';
 import 'ui/login_screen.dart';
+import 'ui/palette.dart';
 import 'ui/shell.dart';
 import 'ui/widgets.dart';
 
@@ -61,6 +63,10 @@ class _SelfstreamAppState extends State<SelfstreamApp> {
       child: Consumer<Session>(
         builder: (context, s, _) {
           if (s.loaded) applyPalette(s.settings.themeId);
+          if (Platform.isWindows) {
+            final pal = palette;
+            WidgetsBinding.instance.addPostFrameCallback((_) => TitleBar.apply(pal.bg, pal.text, light: pal.light));
+          }
           final Widget home;
           if (!s.loaded) {
             home = const Scaffold(body: Center(child: CircularProgressIndicator()));
