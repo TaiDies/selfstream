@@ -3,7 +3,7 @@ name: windows exe
 on:
   push:
     branches: [main]
-    paths-ignore: ["docs/**", "**.md", ".github/workflows/android.yml"]
+    paths-ignore: ["docs/**", "**.md"]
   workflow_dispatch:
 
 permissions:

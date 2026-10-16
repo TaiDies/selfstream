@@ -6,7 +6,7 @@ pubspec.lock
 .flutter-plugins
 .flutter-plugins-dependencies
 
-# The platform folders are generated in CI (see tool/patch_android.py); do not commit them
+# The platform folders are generated in CI; do not commit them
 /android/
 /windows/
 /ios/
