@@ -24,6 +24,8 @@ jobs:
           cache: true
       - name: Generate the Windows project
         run: flutter create --org dev.selfstream --project-name selfstream --platforms windows .
+      - name: App icon
+        run: cp installer/app_icon.ico windows/runner/resources/app_icon.ico
       - name: Dependencies
         run: flutter pub get
       - name: Analyze

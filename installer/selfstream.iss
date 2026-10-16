@@ -20,6 +20,7 @@ OutputBaseFilename=selfstream-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=app_icon.ico
 UninstallDisplayIcon={app}\selfstream.exe
 CloseApplications=yes
 RestartApplications=no
