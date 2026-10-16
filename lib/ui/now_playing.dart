@@ -9,6 +9,7 @@ import '../core/models.dart';
 import '../state/library.dart';
 import '../state/offline.dart';
 import '../state/player.dart';
+import '../state/settings.dart';
 import 'artist_screen.dart';
 import 'widgets.dart';
 
@@ -274,10 +275,11 @@ class LyricsView extends StatefulWidget {
 }
 
 class _LyricsViewState extends State<LyricsView> {
-  static const double rowHeight = 54;
   final ScrollController scroll = ScrollController();
+  final List<GlobalKey> keys = [];
   int lastActive = -1;
   StreamSubscription<Duration>? sub;
+  bool _following = false;
 
   @override
   void dispose() {
@@ -287,7 +289,8 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _follow(Lyrics l) {
-    if (sub != null || !l.synced) return;
+    if (_following || !l.synced) return;
+    _following = true;
     sub = widget.player.positionStream.listen((pos) {
       var active = -1;
       for (var i = 0; i < l.lines.length; i++) {
@@ -299,17 +302,26 @@ class _LyricsViewState extends State<LyricsView> {
       }
       if (active != lastActive) {
         lastActive = active;
-        if (mounted) setState(() {});
-        if (active >= 0 && scroll.hasClients) {
-          final target = (active * rowHeight - scroll.position.viewportDimension / 2 + rowHeight / 2).clamp(0.0, scroll.position.maxScrollExtent);
-          scroll.animateTo(target, duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+        if (!mounted) return;
+        setState(() {});
+        if (active >= 0 && context.read<Settings>().lyricsAutoScroll) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || active >= keys.length) return;
+            final ctx = keys[active].currentContext;
+            if (ctx != null) {
+              Scrollable.ensureVisible(ctx, alignment: 0.4, duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+            }
+          });
         }
       }
     });
   }
 
+  static const _weights = [FontWeight.w400, FontWeight.w600, FontWeight.w700, FontWeight.w800];
+
   @override
   Widget build(BuildContext context) {
+    final st = context.watch<Settings>();
     return FutureBuilder<Lyrics?>(
       future: widget.future,
       builder: (_, snap) {
@@ -317,32 +329,135 @@ class _LyricsViewState extends State<LyricsView> {
         final l = snap.data;
         if (l == null) return const EmptyNote('No lyrics found for this song', icon: Icons.lyrics_outlined);
         _follow(l);
-        return ListView.builder(
-          controller: scroll,
-          itemExtent: rowHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          itemCount: l.lines.length,
-          itemBuilder: (_, i) {
-            final active = i == lastActive;
-            return InkWell(
-              onTap: l.synced ? () => widget.player.seek(l.lines[i].start) : null,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  l.lines[i].text.isEmpty ? '...' : l.lines[i].text,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: active ? 22 : 18,
-                    fontWeight: FontWeight.w800,
-                    color: !l.synced || active ? kText : kMuted,
-                  ),
-                ),
-              ),
-            );
-          },
-        );
+        while (keys.length < l.lines.length) {
+          keys.add(GlobalKey());
+        }
+        final align = const [TextAlign.left, TextAlign.center, TextAlign.right][st.lyricsAlign];
+        final cross = const [CrossAxisAlignment.start, CrossAxisAlignment.center, CrossAxisAlignment.end][st.lyricsAlign];
+        final half = MediaQuery.of(context).size.height * 0.3;
+        return Stack(children: [
+          SingleChildScrollView(
+            controller: scroll,
+            padding: EdgeInsets.fromLTRB(24, 24, 24, half),
+            child: Column(
+              crossAxisAlignment: cross,
+              children: [
+                for (var i = 0; i < l.lines.length; i++)
+                  _line(l, i, st, align),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 4,
+            top: 0,
+            child: IconButton(
+              tooltip: 'Lyrics style',
+              icon: Icon(Icons.text_fields, color: kMuted),
+              onPressed: () => showLyricsStyle(context),
+            ),
+          ),
+        ]);
       },
+    );
+  }
+
+  Widget _line(Lyrics l, int i, Settings st, TextAlign align) {
+    final active = i == lastActive;
+    final bright = !l.synced || active;
+    final color = bright ? (st.lyricsAccent && active ? kAccent : kText) : kText.withValues(alpha: st.lyricsDim);
+    return InkWell(
+      key: keys[i],
+      onTap: l.synced ? () => widget.player.seek(l.lines[i].start) : null,
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: st.lyricsSpacing / 2),
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            textAlign: align,
+            style: TextStyle(
+              fontSize: active ? st.lyricsSize * 1.1 : st.lyricsSize,
+              fontWeight: _weights[st.lyricsWeight],
+              height: 1.25,
+              color: color,
+            ),
+            child: Text(l.lines[i].text.isEmpty ? '...' : l.lines[i].text, textAlign: align),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void showLyricsStyle(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => const _LyricsStyleSheet(),
+  );
+}
+
+class _LyricsStyleSheet extends StatelessWidget {
+  const _LyricsStyleSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final st = context.watch<Settings>();
+    Widget slider(String label, double value, double min, double max, ValueChanged<double> on) => Row(children: [
+          SizedBox(width: 92, child: Text(label)),
+          Expanded(child: Slider(value: value, min: min, max: max, onChanged: on)),
+        ]);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Expanded(child: Text('Lyrics style', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            TextButton(onPressed: st.resetLyrics, child: const Text('Reset')),
+          ]),
+          slider('Size', st.lyricsSize, 12, 40, (v) => st.lyricsSize = v),
+          slider('Line spacing', st.lyricsSpacing, 0, 40, (v) => st.lyricsSpacing = v),
+          slider('Inactive lines', st.lyricsDim, 0.2, 1, (v) => st.lyricsDim = v),
+          const SizedBox(height: 8),
+          const Text('Alignment'),
+          const SizedBox(height: 6),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, icon: Icon(Icons.format_align_left)),
+              ButtonSegment(value: 1, icon: Icon(Icons.format_align_center)),
+              ButtonSegment(value: 2, icon: Icon(Icons.format_align_right)),
+            ],
+            selected: {st.lyricsAlign},
+            onSelectionChanged: (s) => st.lyricsAlign = s.first,
+          ),
+          const SizedBox(height: 12),
+          const Text('Weight'),
+          const SizedBox(height: 6),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('Light')),
+              ButtonSegment(value: 1, label: Text('Medium')),
+              ButtonSegment(value: 2, label: Text('Bold')),
+              ButtonSegment(value: 3, label: Text('Black')),
+            ],
+            selected: {st.lyricsWeight},
+            onSelectionChanged: (s) => st.lyricsWeight = s.first,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Highlight in theme colour'),
+            value: st.lyricsAccent,
+            onChanged: (v) => st.lyricsAccent = v,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Follow the song'),
+            subtitle: const Text('Keep the current line in view'),
+            value: st.lyricsAutoScroll,
+            onChanged: (v) => st.lyricsAutoScroll = v,
+          ),
+        ]),
+      ),
     );
   }
 }

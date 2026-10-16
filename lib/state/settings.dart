@@ -90,4 +90,61 @@ class Settings extends ChangeNotifier {
     final trimmed = v.length > 500 ? v.sublist(v.length - 500) : v;
     _p.setString('pendingPlays', jsonEncode(trimmed));
   }
+
+  // ---- Lyrics appearance ----
+  /// Text size of a lyric line (the line being sung is a little larger).
+  double get lyricsSize => (_p.getDouble('lyricsSize') ?? 20).clamp(12.0, 40.0);
+  set lyricsSize(double v) {
+    _p.setDouble('lyricsSize', v.clamp(12.0, 40.0));
+    notifyListeners();
+  }
+
+  /// 0 = left, 1 = center, 2 = right.
+  int get lyricsAlign => (_p.getInt('lyricsAlign') ?? 0).clamp(0, 2);
+  set lyricsAlign(int v) {
+    _p.setInt('lyricsAlign', v.clamp(0, 2));
+    notifyListeners();
+  }
+
+  /// Font weight index: 0 = regular, 1 = medium, 2 = bold, 3 = extra bold.
+  int get lyricsWeight => (_p.getInt('lyricsWeight') ?? 3).clamp(0, 3);
+  set lyricsWeight(int v) {
+    _p.setInt('lyricsWeight', v.clamp(0, 3));
+    notifyListeners();
+  }
+
+  /// Space between lines, in logical pixels.
+  double get lyricsSpacing => (_p.getDouble('lyricsSpacing') ?? 12).clamp(0.0, 40.0);
+  set lyricsSpacing(double v) {
+    _p.setDouble('lyricsSpacing', v.clamp(0.0, 40.0));
+    notifyListeners();
+  }
+
+  /// How faint the lines that are not being sung are (0.2 .. 1).
+  double get lyricsDim => (_p.getDouble('lyricsDim') ?? 0.45).clamp(0.2, 1.0);
+  set lyricsDim(double v) {
+    _p.setDouble('lyricsDim', v.clamp(0.2, 1.0));
+    notifyListeners();
+  }
+
+  /// The line being sung is drawn in the theme colour instead of white.
+  bool get lyricsAccent => _p.getBool('lyricsAccent') ?? false;
+  set lyricsAccent(bool v) {
+    _p.setBool('lyricsAccent', v);
+    notifyListeners();
+  }
+
+  /// Keep the line being sung in the middle of the view.
+  bool get lyricsAutoScroll => _p.getBool('lyricsAutoScroll') ?? true;
+  set lyricsAutoScroll(bool v) {
+    _p.setBool('lyricsAutoScroll', v);
+    notifyListeners();
+  }
+
+  void resetLyrics() {
+    for (final k in ['lyricsSize', 'lyricsAlign', 'lyricsWeight', 'lyricsSpacing', 'lyricsDim', 'lyricsAccent', 'lyricsAutoScroll']) {
+      _p.remove(k);
+    }
+    notifyListeners();
+  }
 }
