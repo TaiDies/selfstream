@@ -65,7 +65,7 @@ class PresenceService {
       final st = player.player.playerState;
       final audible = st.playing && st.processingState != ProcessingState.idle && st.processingState != ProcessingState.completed;
       final playing = audible && song != null && settings.discordPresence;
-      final key = '${playing ? song.id : ''}|${settings.discordPresence}|${settings.discordClientId}|${playing ? _seeks : 0}';
+      final key = '${playing ? song.id : ''}|${settings.discordPresence}|${playing ? _seeks : 0}';
       if (key == _lastKey) return;
       _lastKey = key;
       if (!playing) {
@@ -78,7 +78,7 @@ class PresenceService {
       }
       final card = await _card(song);
       if (card == null || _disposed) return;
-      final id = settings.discordClientId.isNotEmpty ? settings.discordClientId : '${card['clientId'] ?? ''}';
+      final id = '${card['clientId'] ?? ''}';
       if (id.isEmpty) return; // no Discord application configured
       if (id != _clientId) {
         _ipc?.close();

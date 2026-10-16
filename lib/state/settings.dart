@@ -62,11 +62,6 @@ class Settings extends ChangeNotifier {
     notifyListeners();
   }
 
-  String get discordClientId => _p.getString('discordClientId') ?? '';
-  set discordClientId(String v) {
-    _p.setString('discordClientId', v.trim());
-    notifyListeners();
-  }
 
   /// Report what you listen to, for Stats and Discover.
   bool get trackListening => _p.getBool('trackListening') ?? true;

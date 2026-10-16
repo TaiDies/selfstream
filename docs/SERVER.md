@@ -109,7 +109,7 @@ What this server offers. The app calls it after sign-in and builds its tabs from
 | `stats`, `discover` | only used by your own `screens` and manifest tabs | (your screens) |
 | `state` | "continue where you left off" queue across devices | `state/{key}` |
 | `suggest` | search-as-you-type suggestions | `suggest` |
-| `presence` | Windows: Discord "now playing" card | `presence` |
+| `presence` | Windows: Discord "now playing" card. List it only when you have a Discord application ID (`clientId` in the answer); without it the app shows the setting greyed out | `presence` |
 | `share` | "Share" in song menus and the player: copies the link the server returns | `GET share` |
 | `like-download` | a setting "Liking downloads to the server" | `star` accepts `ssDownload=0` |
 

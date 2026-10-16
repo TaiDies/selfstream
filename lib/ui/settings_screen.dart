@@ -103,23 +103,16 @@ class SettingsScreen extends StatelessWidget {
           onChanged: (v) => settings.trackListening = v,
         ),
         const Divider(),
-        if (PresenceService.supported && context.has('presence')) ...[
+        if (PresenceService.supported) ...[
           const SectionHeader('Discord'),
           SwitchListTile(
             secondary: const Icon(Icons.sports_esports_outlined),
             title: const Text('Show what I am playing'),
-            subtitle: const Text('Title, artist, cover and a YouTube link on your Discord profile. Needs the Discord app open.'),
-            value: settings.discordPresence,
-            onChanged: (v) => settings.discordPresence = v,
-          ),
-          ListTile(
-            leading: const Icon(Icons.badge_outlined),
-            title: const Text('Discord application ID'),
-            subtitle: Text(settings.discordClientId.isEmpty ? 'Using the one set on the server' : settings.discordClientId),
-            onTap: () async {
-              final v = await askText(context, 'Discord application ID', 'From discord.com/developers (leave empty to use the server\'s)', initial: settings.discordClientId);
-              if (v != null) settings.discordClientId = v;
-            },
+            subtitle: Text(context.has('presence')
+                ? 'Title, artist, cover and an Open button on your Discord profile. Needs the Discord app open.'
+                : 'This server has no Discord application ID set, so it is not available.'),
+            value: context.has('presence') && settings.discordPresence,
+            onChanged: context.has('presence') ? (v) => settings.discordPresence = v : null,
           ),
           const Divider(),
         ],
