@@ -110,6 +110,7 @@ What this server offers. The app calls it after sign-in and builds its tabs from
 | `state` | "continue where you left off" queue across devices | `state/{key}` |
 | `suggest` | search-as-you-type suggestions | `suggest` |
 | `presence` | Windows: Discord "now playing" card | `presence` |
+| `share` | "Share" in song menus and the player: copies the link the server returns | `GET share` |
 | `like-download` | a setting "Liking downloads to the server" | `star` accepts `ssDownload=0` |
 
 ### `GET screens/{id}` : server-described screens
@@ -203,6 +204,7 @@ A follow turns an item the server knows about into a playlist that keeps itself 
 | `GET state/{key}` / `PUT state/{key}` (`{"value": any}`) | small per-user storage, max 200 kB. The app stores key `queue` |
 | `GET suggest?q=` | `{"suggestions": ["...", ...]}` (up to 8) |
 | `GET presence?id=&title=&artist=&album=` | `{clientId, details, state, largeImage, largeText, buttons: [{label, url}]}`, the card the Windows app hands to Discord. `largeImage` must be a public URL |
+| `GET share?id=&title=&artist=` | `{url, title, artist}`: the link copied by Share (404 if none). Use the same URL as the button in `presence` |
 | `GET remote/playlists?q=` and `GET remote/playlists/{id}` | playlists the server can browse outside your library (`cards` of kind `remotePlaylist`) |
 | `GET stats?range=week|month|year|all&tz=` | optional; only used by your own `screens` |
 

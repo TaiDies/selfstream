@@ -117,6 +117,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 icon: Icon(Icons.speed, color: p.speed == 1.0 ? kMuted : kAccent),
                 onPressed: () => _speedDialog(context, p),
               ),
+              if (context.has('share')) IconButton(tooltip: 'Share', icon: Icon(Icons.share_outlined, color: kMuted), onPressed: () => shareSong(context, s)),
               if (context.has('playlists')) IconButton(tooltip: 'Add to playlist', icon: Icon(Icons.playlist_add, color: kMuted), onPressed: () => showPlaylistPicker(context, [s])),
               if (!isDesktop)
                 IconButton(

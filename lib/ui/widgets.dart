@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api.dart';
@@ -313,6 +314,19 @@ class SongAction {
   final Future<void> Function() run;
 }
 
+/// Asks the server for the song's link and copies it to the clipboard.
+Future<void> shareSong(BuildContext context, Song s) async {
+  try {
+    final r = await context.api.v1Get('share', {'id': s.id, 'title': s.title, 'artist': s.artist});
+    final url = '${r['url'] ?? ''}';
+    if (url.isEmpty) throw Exception('no link');
+    await Clipboard.setData(ClipboardData(text: url));
+    if (context.mounted) context.toast('Link copied');
+  } catch (_) {
+    if (context.mounted) context.toast('Could not get a link for this song');
+  }
+}
+
 Future<void> showSongMenu(BuildContext context, Song s, {List<SongAction> extras = const []}) async {
   final player = context.read<PlayerController>();
   final offline = context.read<OfflineStore>();
@@ -360,6 +374,7 @@ Future<void> showSongMenu(BuildContext context, Song s, {List<SongAction> extras
                 await offline.download(s);
               }
             }),
+            if (context.has('share')) item(Icons.share_outlined, 'Share', () => shareSong(context, s)),
             if (s.artistId.isNotEmpty)
               item(Icons.person_outline, 'Go to artist', () async {
                 if (context.mounted) await context.open(ArtistScreen(artistId: s.artistId, name: s.artist));
