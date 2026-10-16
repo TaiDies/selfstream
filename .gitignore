@@ -1,0 +1,19 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# The platform folders are generated in CI (see tool/patch_android.py); do not commit them
+/android/
+/windows/
+/ios/
+/macos/
+/linux/
+
+# Signing material never goes in the repository
+*.jks
+*.keystore
+key.properties
