@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../core/api.dart';
 import '../core/models.dart';
@@ -23,12 +24,20 @@ class PresenceService {
   Timer? _debounce;
   final Map<String, Map<String, dynamic>> _cards = {};
   bool _disposed = false;
+  int _seeks = 0; // bumps on every jump in the song, so the timer is sent again
+  final List<StreamSubscription<Object?>> _subs = [];
 
   static bool get supported => Platform.isWindows;
 
   void start() {
     player.addListener(_changed);
     settings.addListener(_changed);
+    // The Discord timer must follow the real audio: pausing, stopping and seeking all show up here.
+    _subs.add(player.player.playerStateStream.listen((_) => _changed()));
+    _subs.add(player.player.positionDiscontinuityStream.listen((_) {
+      _seeks++;
+      _changed();
+    }));
   }
 
   void _changed() {
@@ -53,8 +62,10 @@ class PresenceService {
     if (_disposed) return;
     try {
       final song = player.current;
-      final playing = player.playing && song != null && settings.discordPresence;
-      final key = '${playing ? song.id : ''}|${settings.discordPresence}|${settings.discordClientId}';
+      final st = player.player.playerState;
+      final audible = st.playing && st.processingState != ProcessingState.idle && st.processingState != ProcessingState.completed;
+      final playing = audible && song != null && settings.discordPresence;
+      final key = '${playing ? song.id : ''}|${settings.discordPresence}|${settings.discordClientId}|${playing ? _seeks : 0}';
       if (key == _lastKey) return;
       _lastKey = key;
       if (!playing) {
@@ -98,6 +109,9 @@ class PresenceService {
   void dispose() {
     _disposed = true;
     _debounce?.cancel();
+    for (final sub in _subs) {
+      sub.cancel();
+    }
     player.removeListener(_changed);
     settings.removeListener(_changed);
     unawaited(_ipc?.setActivity(null).then((_) => _ipc?.close()) ?? Future<void>.value());
