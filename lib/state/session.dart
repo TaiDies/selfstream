@@ -19,6 +19,9 @@ class Services {
   Services(this.api, this.settings)
       : offline = OfflineStore(api, settings),
         library = Library(api) {
+    _back = api.offlineChanges.listen((off) {
+      if (!off) library.refresh(); // the server answered again
+    });
     library.downloadOnLike = () => settings.likeDownloadsToServer && caps.has('like-download');
     library.has = caps.has;
     player = PlayerController(api, library, offline, settings);
@@ -34,6 +37,7 @@ class Services {
   final CapsHolder caps = CapsHolder();
 
   StreamSubscription<List<ConnectivityResult>>? _net;
+  StreamSubscription<bool>? _back;
 
   bool _none(List<ConnectivityResult> r) => r.isEmpty || r.every((x) => x == ConnectivityResult.none);
 
@@ -64,6 +68,7 @@ class Services {
     presence?.dispose();
     caps.dispose();
     _net?.cancel();
+    _back?.cancel();
     player.dispose();
     library.dispose();
     api.close();

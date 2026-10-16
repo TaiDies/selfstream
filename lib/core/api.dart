@@ -50,6 +50,32 @@ class Api {
     _setOffline(v);
   }
 
+  // The device may have internet while the server itself is down or unreachable (VPN off, away from home, server
+  // restarting). After one failed request, skip the network for a while and answer from the saved copies at once;
+  // a quiet check every few seconds brings the app back online as soon as the server answers.
+  bool _serverDown = false;
+  Timer? _probe;
+
+  void _markServerDown() {
+    if (_serverDown) return;
+    _serverDown = true;
+    _setOffline(true);
+    _probe?.cancel();
+    _probe = Timer.periodic(const Duration(seconds: 8), (_) async {
+      try {
+        final r = await _http.get(_uri('/selfstream/api/v1/ping', const {})).timeout(const Duration(seconds: 6));
+        if (r.statusCode < 500) _serverBack();
+      } catch (_) {}
+    });
+  }
+
+  void _serverBack() {
+    _serverDown = false;
+    _probe?.cancel();
+    _probe = null;
+    _setOffline(_forcedOffline);
+  }
+
   final StreamController<bool> _offlineChanges = StreamController<bool>.broadcast();
   Stream<bool> get offlineChanges => _offlineChanges.stream;
 
@@ -363,6 +389,7 @@ class Api {
   // ------------------------------------------------------------ plumbing
   Future<http.Response> _send(String method, Uri uri, {Object? body, Duration? timeout}) async {
     if (_forcedOffline) throw ApiException('You are offline');
+    if (_serverDown && !uri.path.endsWith('/ping')) throw ApiException('The server cannot be reached right now');
     final limit = timeout ?? _timeout;
     try {
       final req = http.Request(method, uri);
@@ -371,10 +398,13 @@ class Api {
         req.body = jsonEncode(body);
       }
       final streamed = await _http.send(req).timeout(limit);
-      return await http.Response.fromStream(streamed).timeout(limit);
+      final res = await http.Response.fromStream(streamed).timeout(limit);
+      if (_serverDown) _serverBack();
+      return res;
     } on ApiException {
       rethrow;
     } catch (e) {
+      _markServerDown();
       throw ApiException('Cannot reach the server ($e)');
     }
   }
@@ -392,6 +422,7 @@ class Api {
   static Map<String, dynamic> _asMap(Object? v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
 
   void close() {
+    _probe?.cancel();
     _http.close();
     _offlineChanges.close();
   }

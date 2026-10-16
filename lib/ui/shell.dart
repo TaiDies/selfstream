@@ -93,7 +93,7 @@ class _ShellState extends State<Shell> {
                 child: Row(children: [
                   Icon(Icons.cloud_off, size: 16, color: kMuted),
                   const SizedBox(width: 8),
-                  Expanded(child: Text('Offline: showing saved pages. Downloaded songs still play.', style: TextStyle(color: kMuted, fontSize: 12))),
+                  Expanded(child: Text('Offline or server unreachable: showing saved pages. Downloaded songs still play. Reconnects by itself.', style: TextStyle(color: kMuted, fontSize: 12))),
                 ]),
               ),
             )
