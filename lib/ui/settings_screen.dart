@@ -6,6 +6,8 @@ import '../state/offline.dart';
 import '../state/presence.dart';
 import '../state/session.dart';
 import '../state/settings.dart';
+import '../state/updater.dart';
+import 'update_dialog.dart';
 import 'widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -118,6 +120,22 @@ class SettingsScreen extends StatelessWidget {
               final v = await askText(context, 'Discord application ID', 'From discord.com/developers (leave empty to use the server\'s)', initial: settings.discordClientId);
               if (v != null) settings.discordClientId = v;
             },
+          ),
+          const Divider(),
+        ],
+        if (Updater.supported) ...[
+          const SectionHeader('Updates'),
+          SwitchListTile(
+            secondary: const Icon(Icons.system_update_alt),
+            title: const Text('Check for updates when the app starts'),
+            subtitle: Text('Build $kBuildNumber'),
+            value: settings.checkUpdates,
+            onChanged: (v) => settings.checkUpdates = v,
+          ),
+          ListTile(
+            leading: const Icon(Icons.refresh),
+            title: const Text('Check now'),
+            onTap: () => checkForUpdate(context, manual: true),
           ),
           const Divider(),
         ],

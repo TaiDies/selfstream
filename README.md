@@ -20,7 +20,7 @@ Download the latest build from the **Releases** page:
 | Platform | File |
 |---|---|
 | Android | `selfstream-<version>-<build>.apk` (allow "install unknown apps") |
-| Windows | `selfstream-windows.zip` (unzip, keep the folder together, run `selfstream.exe`) |
+| Windows | `selfstream-setup.exe` (installer, no admin rights needed; the app checks GitHub for a newer build when it starts and offers to update). `selfstream-windows.zip` is a portable copy without updates |
 
 Open the app, enter your server address (for example `http://192.168.1.50:4533`) and your login.
 

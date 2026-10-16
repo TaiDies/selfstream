@@ -13,6 +13,9 @@ import 'library_screen.dart';
 import 'mini_window.dart';
 import 'search_screen.dart';
 import 'server_screen.dart';
+import '../state/settings.dart';
+import '../state/updater.dart';
+import 'update_dialog.dart';
 import 'widgets.dart';
 
 class Shell extends StatefulWidget {
@@ -31,6 +34,12 @@ class _ShellState extends State<Shell> {
     errors = context.read<PlayerController>().errors.listen((m) {
       if (mounted) context.toast(m);
     });
+    if (Updater.supported && context.read<Settings>().checkUpdates) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future<void>.delayed(const Duration(seconds: 3));
+        if (mounted) await checkForUpdate(context);
+      });
+    }
   }
 
   @override

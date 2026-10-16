@@ -147,4 +147,17 @@ class Settings extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  // ---- Updates (Windows installer) ----
+  bool get checkUpdates => _p.getBool('checkUpdates') ?? true;
+  set checkUpdates(bool v) {
+    _p.setBool('checkUpdates', v);
+    notifyListeners();
+  }
+
+  /// A build the user chose to skip; the app stops asking about it.
+  int get skippedBuild => _p.getInt('skippedBuild') ?? 0;
+  set skippedBuild(int v) {
+    _p.setInt('skippedBuild', v);
+  }
 }

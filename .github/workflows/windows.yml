@@ -29,20 +29,26 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos 2>&1 | tee win-analyze.log
       - name: Build
-        run: set -o pipefail; flutter build windows --release 2>&1 | tee win-build.log
+        run: set -o pipefail; flutter build windows --release --dart-define=BUILD_NUMBER=${{ github.run_number }} 2>&1 | tee win-build.log
       - name: Zip
         run: |
           cd build/windows/x64/runner/Release
           7z a -tzip "$GITHUB_WORKSPACE/selfstream-windows.zip" ./*
+      - name: Installer
+        run: |
+          choco install innosetup -y --no-progress
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" "//DAppVersion=$VERSION.${{ github.run_number }}" "//DSourceDir=$(cygpath -w "$PWD/build/windows/x64/runner/Release")" installer/selfstream.iss
+          mv dist/selfstream-setup.exe "$GITHUB_WORKSPACE/selfstream-setup.exe"
       - name: Publish as a release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
           gh release delete windows-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create windows-latest selfstream-windows.zip --prerelease \
+          gh release create windows-latest selfstream-setup.exe selfstream-windows.zip --prerelease \
             --title "Selfstream for Windows $VERSION" \
-            --notes "Unzip, keep the folder together, run selfstream.exe. Built from $GITHUB_SHA."
+            --notes "$(printf 'Run selfstream-setup.exe to install. The app checks for newer builds when it starts and offers to update.\nThe zip is a portable copy (no automatic updates).\n\nBuild: %s\nBuilt from %s.' "${{ github.run_number }}" "$GITHUB_SHA")"
       - name: Keep the log
         if: always()
         env:
