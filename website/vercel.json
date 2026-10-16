@@ -1,1 +1,1 @@
-{"cleanUrls":true,"headers":[{"source":"/img/(.*)","headers":[{"key":"Cache-Control","value":"public, max-age=86400"}]}]}
+{"cleanUrls":true,"git":{"deploymentEnabled":{"windows-logs":false,"ci-logs":false}},"headers":[{"source":"/img/(.*)","headers":[{"key":"Cache-Control","value":"public, max-age=86400"}]}]}

@@ -3,11 +3,15 @@ name: windows exe
 on:
   push:
     branches: [main]
-    paths-ignore: ["docs/**", "**.md"]
+    paths-ignore: ["docs/**", "**.md", "website/**"]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: windows
+  cancel-in-progress: true
 
 jobs:
   build:

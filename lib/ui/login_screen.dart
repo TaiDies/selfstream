@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Icon(Icons.graphic_eq, size: 64, color: kAccent),
+                Image.asset('assets/logo.png', height: 88, filterQuality: FilterQuality.high),
                 const SizedBox(height: 12),
                 const Text('Selfstream', textAlign: TextAlign.center, style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
