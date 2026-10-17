@@ -43,4 +43,4 @@ The app is not directed at children. It collects no personal data from anyone.
 ## Changes and contact
 
 If this policy changes, the new version is published at this address with a new date.
-Questions: **<your contact email here>**
+Questions: open an issue at https://github.com/TaiDies/selfstream/issues

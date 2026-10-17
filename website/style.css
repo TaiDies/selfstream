@@ -48,3 +48,8 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--mute);font-si
 footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between}
 footer a:hover{color:var(--text)}
 @media(max-width:820px){.split,.split.r{grid-template-columns:1fr}.hero-shots .phone{display:none}.hero-shots .win{width:100%}nav a.l{display:none}}
+.doc{padding:64px 0 80px}.doc .wrap{max-width:780px}.doc h1{font-size:clamp(30px,5vw,46px);margin:8px 0 6px}.doc h2{font-size:22px;margin:40px 0 10px;letter-spacing:-.01em}
+.doc p,.doc li{color:#c3ccc8}.doc .meta{color:var(--mute);font-size:14px;margin:0 0 24px}.doc a{color:var(--g);text-decoration:underline;text-underline-offset:3px}
+.doc ul{padding-left:20px}.tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+.doc table{border-collapse:collapse;width:100%;font-size:14.5px}.doc th,.doc td{text-align:left;vertical-align:top;padding:12px 14px;border-bottom:1px solid var(--line)}
+.doc th{background:var(--panel);color:var(--text)}.doc tr:last-child td{border-bottom:0}.doc td{color:#c3ccc8}.doc td:first-child{color:var(--text);min-width:160px}
