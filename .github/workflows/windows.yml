@@ -46,13 +46,32 @@ jobs:
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
           "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" "//DAppVersion=$VERSION.${{ github.run_number }}" "//DSourceDir=$(cygpath -w "$PWD/build/windows/x64/runner/Release")" installer/selfstream.iss
           mv dist/selfstream-setup.exe "$GITHUB_WORKSPACE/selfstream-setup.exe"
+      - name: Microsoft Store package (MSIX)
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_NAME: ${{ vars.MSIX_PUBLISHER_NAME }}
+        run: |
+          if [ -z "$MSIX_IDENTITY_NAME" ] || [ -z "$MSIX_PUBLISHER" ] || [ -z "$MSIX_PUBLISHER_NAME" ]; then
+            echo "Partner Center values not set (repo variables MSIX_IDENTITY_NAME, MSIX_PUBLISHER, MSIX_PUBLISHER_NAME); skipping the MSIX."
+            exit 0
+          fi
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          dart run msix:create --store --build-windows false \
+            --display-name Selfstream --identity-name "$MSIX_IDENTITY_NAME" \
+            --publisher "$MSIX_PUBLISHER" --publisher-display-name "$MSIX_PUBLISHER_NAME" \
+            --version "${VERSION%.*}.${{ github.run_number }}.0" --logo-path assets/logo.png \
+            --capabilities internetClient,privateNetworkClientServer --output-name selfstream-store 2>&1 | tee win-msix.log
+          find build -name 'selfstream-store.msix' -exec cp {} "$GITHUB_WORKSPACE/selfstream-store.msix" \;
       - name: Publish as a release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
           gh release delete windows-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create windows-latest selfstream-setup.exe selfstream-windows.zip --prerelease \
+          ASSETS="selfstream-setup.exe selfstream-windows.zip"
+          [ -f selfstream-store.msix ] && ASSETS="$ASSETS selfstream-store.msix"
+          gh release create windows-latest $ASSETS --prerelease \
             --title "Selfstream for Windows $VERSION" \
             --notes "$(printf 'Run selfstream-setup.exe to install. The app checks for newer builds when it starts and offers to update.\nThe zip is a portable copy (no automatic updates).\n\nBuild: %s\nBuilt from %s.' "${{ github.run_number }}" "$GITHUB_SHA")"
       - name: Keep the log
