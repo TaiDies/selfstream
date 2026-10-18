@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api.dart';
@@ -150,7 +151,37 @@ class _ShellState extends State<Shell> {
   /// Bumped when the visible page or the tab list changes, so the page inside the side-bar navigator redraws.
   final ValueNotifier<int> _rev = ValueNotifier<int>(0);
 
+  // Android back button: tabs visited, most recent last. Back goes to the previous tab, then Home, then asks to press again to leave.
+  final List<int> _history = [];
+  DateTime? _lastBack;
+
+  void _back() {
+    if (_history.isNotEmpty) {
+      _go(_history.removeLast());
+    } else if (tab != 0) {
+      _go(0);
+    } else {
+      final now = DateTime.now();
+      if (_lastBack != null && now.difference(_lastBack!) < const Duration(seconds: 2)) {
+        SystemNavigator.pop();
+      } else {
+        _lastBack = now;
+        context.toast('Press back again to leave');
+      }
+    }
+  }
+
+  void _go(int i) {
+    setState(() => tab = i);
+    _rev.value++;
+    shellNavigator.currentState?.popUntil((r) => r.isFirst);
+  }
+
   void goTo(int i) {
+    if (i != tab) {
+      _history.add(tab);
+      if (_history.length > 20) _history.removeAt(0);
+    }
     setState(() => tab = i);
     _rev.value++;
     // going to a tab (or tapping the open one again) returns to that tab's own page
@@ -225,7 +256,7 @@ class _ShellState extends State<Shell> {
       key: shellNavigator,
       onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => ValueListenableBuilder<int>(valueListenable: _rev, builder: (_, __, ___) => bodyNow())),
     );
-    return LayoutBuilder(builder: (context, c) {
+    final page = LayoutBuilder(builder: (context, c) {
       final wide = c.maxWidth >= 800;
       if (wide) {
         return Scaffold(
@@ -283,5 +314,13 @@ class _ShellState extends State<Shell> {
         ]),
       );
     });
+    if (!Platform.isAndroid) return page;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: page,
+    );
   }
 }
