@@ -10,6 +10,8 @@ import '../platform/platform.dart';
 import '../state/background_setup.dart';
 import '../state/desktop_window.dart';
 import '../state/download_notice.dart';
+import '../state/home_widgets.dart';
+import 'package:home_widget/home_widget.dart';
 import '../state/offline.dart';
 import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
@@ -40,6 +42,8 @@ class _ShellState extends State<Shell> {
   HotkeyService? _hotkeys;
   GlobalHotkeyService? _globalHotkeys;
   DownloadNotice? _notice;
+  HomeWidgetsSync? _widgets;
+  StreamSubscription<Uri?>? _widgetClicks;
 
   @override
   void initState() {
@@ -51,6 +55,11 @@ class _ShellState extends State<Shell> {
     if (Platform.isWindows) _globalHotkeys = GlobalHotkeyService(settings: context.read<Settings>(), run: _globalHotkey)..start();
     if (Platform.isAndroid) {
       _notice = DownloadNotice(context.read<OfflineStore>())..start();
+      _widgets = HomeWidgetsSync(context.read<PlayerController>())..start();
+      _widgetClicks = HomeWidget.widgetClicked.listen(_widgetClick);
+      HomeWidget.initiallyLaunchedFromHomeWidget().then((u) {
+        if (u != null) WidgetsBinding.instance.addPostFrameCallback((_) => _widgetClick(u));
+      });
       if (!context.read<Settings>().askedBackground) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           await Future<void>.delayed(const Duration(seconds: 1));
@@ -140,6 +149,8 @@ class _ShellState extends State<Shell> {
   @override
   void dispose() {
     _notice?.dispose();
+    _widgets?.dispose();
+    _widgetClicks?.cancel();
     _hotkeys?.stop();
     unawaited(_globalHotkeys?.stop() ?? Future<void>.value());
     errors?.cancel();
@@ -186,6 +197,30 @@ class _ShellState extends State<Shell> {
     _rev.value++;
     // going to a tab (or tapping the open one again) returns to that tab's own page
     shellNavigator.currentState?.popUntil((r) => r.isFirst);
+  }
+
+  /// A tap on a home screen widget's shortcut (selfstream://widget/<what>).
+  Future<void> _widgetClick(Uri? uri) async {
+    if (uri == null || !mounted) return;
+    final what = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : uri.host;
+    int kindTab(String kind) => _tabs.indexWhere((t) => t.kind == kind);
+    switch (what) {
+      case 'shuffle-liked':
+        final songs = context.read<Library>().likedSongs;
+        if (songs.isEmpty) {
+          context.toast('No liked songs yet');
+        } else {
+          await context.read<PlayerController>().playSongs(songs, shuffle: true);
+        }
+      case 'search':
+        final i = kindTab('search');
+        if (i >= 0) goTo(i);
+      case 'library':
+        final i = kindTab('library');
+        if (i >= 0) goTo(i);
+      case 'now-playing':
+        if (context.read<PlayerController>().current != null) openNowPlaying(context);
+    }
   }
 
   /// Switch to a tab by the id the server gave it.

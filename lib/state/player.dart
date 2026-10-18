@@ -4,12 +4,12 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 
 import '../core/api.dart';
 import '../core/models.dart';
 import 'library.dart';
 import '../platform/platform.dart';
+import 'audio_handler.dart';
 import 'offline.dart';
 import 'settings.dart';
 
@@ -23,6 +23,7 @@ class PlayerController extends ChangeNotifier {
     _subs.add(player.shuffleModeEnabledStream.listen((_) => notifyListeners()));
     _subs.add(player.loopModeStream.listen((_) => notifyListeners()));
     _subs.add(player.speedStream.listen((_) => notifyListeners()));
+    if (!isDesktop) SelfstreamAudio.handler?.attach(this);
     if (isDesktop) {
       player.setVolume(settings.volume);
       _subs.add(player.volumeStream.listen((_) => notifyListeners()));
@@ -91,20 +92,25 @@ class PlayerController extends ChangeNotifier {
     await all().timeout(const Duration(seconds: 5), onTimeout: () {});
   }
 
+  /// The cover for the notification and lock screen: a file on this device when there is one.
+  Uri artFor(Song s) => _coverFiles[s.coverArt] ?? api.coverUri(s.coverArt, size: 512);
+
+  /// The cover file path of the current song, for home screen widgets.
+  String? coverPathFor(Song s) => _coverFiles[s.coverArt]?.toFilePath();
+
+  /// Like or unlike the current song (the notification's heart button, widgets).
+  Future<void> likeCurrent() async {
+    final s = current;
+    if (s == null) return;
+    try {
+      await library.toggleLike(s);
+    } catch (_) {}
+  }
+
   AudioSource _sourceFor(Song s) {
     final path = offline.pathForSong(s);
     final uri = path != null ? Uri.file(path) : api.streamUri(s.id, maxBitRate: settings.maxBitRate);
-    return AudioSource.uri(
-      uri,
-      tag: MediaItem(
-        id: s.id,
-        title: s.title,
-        artist: s.artist,
-        album: s.album,
-        artUri: _coverFiles[s.coverArt] ?? api.coverUri(s.coverArt, size: 512),
-        duration: s.duration > 0 ? Duration(seconds: s.duration) : null,
-      ),
-    );
+    return AudioSource.uri(uri);
   }
 
   // ------------------------------------------------------------ playing
@@ -430,6 +436,7 @@ class PlayerController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    if (!isDesktop) SelfstreamAudio.handler?.detach(this);
     _saveTimer?.cancel();
     _sleepTimer?.cancel();
     for (final s in _subs) {

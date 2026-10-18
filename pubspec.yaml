@@ -13,7 +13,8 @@ dependencies:
   provider: ^6.1.2
   shared_preferences: ^2.3.3
   just_audio: ^0.9.40
-  just_audio_background: ^0.0.1-beta.13
+  audio_service: ^0.18.15
+  home_widget: ^0.7.0
   crypto: ^3.0.6
   cached_network_image: ^3.4.1
   path_provider: ^2.1.5
