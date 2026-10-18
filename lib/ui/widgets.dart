@@ -541,17 +541,18 @@ class VolumeControl extends StatelessWidget {
 
 /// A page with the mini player at the bottom (the side-bar layout already shows one under all pages).
 class PageFrame extends StatelessWidget {
-  const PageFrame({super.key, required this.title, required this.body, this.actions = const []});
+  const PageFrame({super.key, required this.title, required this.body, this.actions = const [], this.miniPlayer = true});
   final String title;
   final Widget body;
   final List<Widget> actions;
+  final bool miniPlayer;
   @override
   Widget build(BuildContext context) {
     final besideSideBar = shellNavigator.currentState != null && Navigator.of(context) == shellNavigator.currentState;
     return Scaffold(
       appBar: AppBar(title: Text(title), actions: actions),
       body: body,
-      bottomNavigationBar: besideSideBar ? null : const MiniPlayer(),
+      bottomNavigationBar: (besideSideBar || !miniPlayer) ? null : const MiniPlayer(),
     );
   }
 }

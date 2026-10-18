@@ -10,7 +10,6 @@ import 'album_screen.dart';
 import 'artist_screen.dart';
 import 'playlist_screen.dart';
 import 'remote_playlist_screen.dart';
-import 'settings_screen.dart';
 import 'widgets.dart';
 
 typedef TabOpener = void Function(String tabId);
@@ -164,7 +163,6 @@ class _ServerScreenState extends State<ServerScreen> with AutomaticKeepAliveClie
               icon: Icon(iconFor('${a['icon']}')),
               onPressed: loading ? null : () => _run(Map<String, dynamic>.from(a['action'] as Map)),
             ),
-          if (d?.settings ?? false) IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () => context.open(const SettingsScreen())),
         ],
       ),
       body: ReloadOnReconnect(

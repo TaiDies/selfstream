@@ -13,6 +13,7 @@ import 'library_screen.dart';
 import 'mini_window.dart';
 import 'search_screen.dart';
 import 'server_screen.dart';
+import 'settings_screen.dart';
 import 'shell_navigator.dart';
 import '../state/settings.dart';
 import '../state/updater.dart';
@@ -97,8 +98,11 @@ class _ShellState extends State<Shell> {
       _tabs = caps.value.tabs;
       WidgetsBinding.instance.addPostFrameCallback((_) => _rev.value++);
     }
-    if (tab >= _tabs.length) tab = 0;
-    final items = [for (final t in _tabs) (tabIconsFor(t.icon).$1, tabIconsFor(t.icon).$2, t.title)];
+    if (tab > _tabs.length) tab = 0; // the last page is Settings, after the server's tabs
+    final items = [
+      for (final t in _tabs) (tabIconsFor(t.icon).$1, tabIconsFor(t.icon).$2, t.title),
+      (Icons.settings_outlined, Icons.settings, 'Settings'),
+    ];
     final api = context.read<Api>();
     final banner = StreamBuilder<bool>(
       stream: api.offlineChanges,
@@ -119,7 +123,7 @@ class _ShellState extends State<Shell> {
             )
           : const SizedBox.shrink(),
     );
-    Widget bodyNow() => Column(children: [banner, Expanded(child: IndexedStack(index: tab, children: [for (final t in _tabs) _page(t)]))]);
+    Widget bodyNow() => Column(children: [banner, Expanded(child: IndexedStack(index: tab, children: [for (final t in _tabs) _page(t), const SettingsScreen(embedded: true)]))]);
     final body = bodyNow();
     // on a wide screen pages opened from a tab open beside the side bar, not over it
     final sideBody = Navigator(

@@ -11,7 +11,10 @@ import 'update_dialog.dart';
 import 'widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.embedded = false});
+
+  /// True when shown as a tab (the shell already has a mini player under it).
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +23,7 @@ class SettingsScreen extends StatelessWidget {
     final session = context.read<Session>();
     return PageFrame(
       title: 'Settings',
+      miniPlayer: !embedded,
       body: ListView(children: [
         ListTile(
           leading: const Icon(Icons.dns_outlined),
