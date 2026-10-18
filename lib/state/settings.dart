@@ -197,6 +197,13 @@ class Settings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Android: the first-run question about notifications and background downloads has been asked.
+  bool get askedBackground => _p.getBool('askedBackground') ?? false;
+  set askedBackground(bool v) {
+    _p.setBool('askedBackground', v);
+    notifyListeners();
+  }
+
   // ---- Updates (Windows installer) ----
   bool get checkUpdates => _p.getBool('checkUpdates') ?? true;
   set checkUpdates(bool v) {

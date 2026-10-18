@@ -10,6 +10,7 @@ import '../state/hotkeys.dart';
 import '../state/offline.dart';
 import '../state/presence.dart';
 import '../state/session.dart';
+import '../state/background_setup.dart';
 import '../state/settings.dart';
 import '../state/updater.dart';
 import 'theme_editor.dart';
@@ -194,6 +195,12 @@ class SettingsScreen extends StatelessWidget {
                   },
             child: const Text('Clear'),
           ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.notifications_active_outlined),
+          title: const Text('Notifications & background downloads'),
+          subtitle: const Text('Show download progress and keep downloading with the screen off'),
+          onTap: () => askBackgroundSetup(context),
         ),
         const Divider(),
         ],

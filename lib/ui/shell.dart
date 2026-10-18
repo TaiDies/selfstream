@@ -6,7 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../core/api.dart';
 import '../platform/platform.dart';
+import '../state/background_setup.dart';
 import '../state/desktop_window.dart';
+import '../state/download_notice.dart';
+import '../state/offline.dart';
 import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
 import '../state/library.dart';
@@ -35,6 +38,7 @@ class _ShellState extends State<Shell> {
   StreamSubscription<String>? errors;
   HotkeyService? _hotkeys;
   GlobalHotkeyService? _globalHotkeys;
+  DownloadNotice? _notice;
 
   @override
   void initState() {
@@ -44,6 +48,15 @@ class _ShellState extends State<Shell> {
     });
     if (isDesktop) _hotkeys = HotkeyService(settings: context.read<Settings>(), run: _hotkey)..start();
     if (Platform.isWindows) _globalHotkeys = GlobalHotkeyService(settings: context.read<Settings>(), run: _globalHotkey)..start();
+    if (Platform.isAndroid) {
+      _notice = DownloadNotice(context.read<OfflineStore>())..start();
+      if (!context.read<Settings>().askedBackground) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          if (mounted) await askBackgroundSetup(context);
+        });
+      }
+    }
     if (appUpdatesSupported && context.read<Settings>().checkUpdates) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await Future<void>.delayed(const Duration(seconds: 3));
@@ -125,6 +138,7 @@ class _ShellState extends State<Shell> {
 
   @override
   void dispose() {
+    _notice?.dispose();
     _hotkeys?.stop();
     unawaited(_globalHotkeys?.stop() ?? Future<void>.value());
     errors?.cancel();

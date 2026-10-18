@@ -29,6 +29,7 @@ Future<void> main() async {
       androidNotificationChannelId: 'dev.selfstream.audio',
       androidNotificationChannelName: 'Selfstream playback',
       androidNotificationOngoing: true,
+      androidNotificationIcon: 'drawable/ic_stat_selfstream',
     );
   } else if (isDesktop) {
     JustAudioMediaKit.ensureInitialized(windows: Platform.isWindows, linux: Platform.isLinux, macOS: Platform.isMacOS);

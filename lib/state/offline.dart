@@ -22,6 +22,12 @@ class OfflineStore extends ChangeNotifier {
   final Map<String, double> progress = {}; // song id -> 0..1 while downloading
   final Map<String, String> failed = {};
 
+  // The current run of downloads, for the status notification.
+  int batchTotal = 0, batchDone = 0, batchFailed = 0;
+  int _pending = 0;
+  bool get busy => _pending > 0;
+  void resetBatch() => batchTotal = batchDone = batchFailed = 0;
+
   Future<void> load() async {
     if (isDesktop) {
       notifyListeners(); // computers just stream: nothing is saved on them
@@ -154,6 +160,25 @@ class OfflineStore extends ChangeNotifier {
 
   Future<void> download(Song s) async {
     if (_dir == null || has(s.id) || progress.containsKey(s.id)) return;
+    if (!busy) resetBatch();
+    batchTotal++;
+    _pending++;
+    await _run(s);
+  }
+
+  Future<void> _run(Song s) async {
+    try {
+      await _fetch(s);
+    } finally {
+      if (failed.containsKey(s.id)) batchFailed++;
+      batchDone++;
+      _pending--;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _fetch(Song s) async {
+    if (_dir == null || has(s.id) || progress.containsKey(s.id)) return;
     progress[s.id] = 0;
     failed.remove(s.id);
     notifyListeners();
@@ -194,8 +219,14 @@ class OfflineStore extends ChangeNotifier {
   }
 
   Future<void> downloadAll(Iterable<Song> songs) async {
-    for (final s in songs) {
-      await download(s);
+    final fresh = songs.where((s) => _dir != null && !has(s.id) && !progress.containsKey(s.id)).toList();
+    if (fresh.isEmpty) return;
+    if (!busy) resetBatch();
+    batchTotal += fresh.length;
+    _pending += fresh.length;
+    notifyListeners();
+    for (final s in fresh) {
+      await _run(s);
     }
   }
 
