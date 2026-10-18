@@ -69,6 +69,11 @@ class PlayerController extends ChangeNotifier {
   Future<void> _warmCovers(Iterable<Song> songs) async {
     if (isDesktop) return;
     final ids = <String>{for (final s in songs) s.coverArt}..removeWhere((i) => i.isEmpty || _coverFiles.containsKey(i));
+    for (final id in ids.toList()) {
+      final saved = offline.coverFor(id); // saved with the downloaded song: works without a connection
+      if (saved != null) _coverFiles[id] = Uri.file(saved.path);
+    }
+    ids.removeWhere(_coverFiles.containsKey);
     final list = ids.toList();
     Future<void> one(String id) async {
       try {

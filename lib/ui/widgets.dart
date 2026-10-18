@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -102,9 +103,17 @@ class Cover extends StatelessWidget {
       color: kCard,
       child: Icon(Icons.music_note, color: kMuted, size: size * 0.4),
     );
+    File? saved;
+    if (!isDesktop) {
+      try {
+        saved = context.read<OfflineStore>().coverFor(id);
+      } catch (_) {}
+    }
     final Widget image = id.isEmpty
         ? placeholder
-        : isDesktop
+        : saved != null
+            ? Image.file(saved, width: size, height: size, fit: BoxFit.cover, cacheWidth: px, errorBuilder: (_, __, ___) => placeholder)
+            : isDesktop
             ? Image.network(
                 api.coverUri(id, size: px).toString(),
                 width: size,

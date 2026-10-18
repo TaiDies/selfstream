@@ -83,8 +83,60 @@ class OfflineStore extends ChangeNotifier {
     } catch (_) {
       _dir = null;
     }
+    await _loadCovers();
     notifyListeners();
     unawaited(_backfillLyrics());
+    unawaited(_backfillCovers());
+  }
+
+  // ---- album covers saved with the songs, so they show (and go to the notification) without a connection
+  final Set<String> _covers = {};
+  static String _coverName(String id) => '${id.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.jpg';
+
+  /// The saved cover for this cover id, or null if none is on this device.
+  File? coverFor(String id) {
+    if (id.isEmpty || _dir == null) return null;
+    final name = _coverName(id);
+    return _covers.contains(name) ? File('${_dir!.path}/covers/$name') : null;
+  }
+
+  Future<void> _loadCovers() async {
+    try {
+      final d = Directory('${_dir!.path}/covers');
+      if (!await d.exists()) return;
+      await for (final f in d.list()) {
+        final name = f.path.split(RegExp(r'[\\/]')).last;
+        if (name.endsWith('.jpg') && await File(f.path).length() > 500) _covers.add(name);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveCover(String id) async {
+    if (id.isEmpty || _dir == null) return;
+    final name = _coverName(id);
+    if (_covers.contains(name)) return;
+    final client = http.Client();
+    try {
+      final res = await client.get(api.coverUri(id, size: 600)).timeout(const Duration(seconds: 15));
+      if (res.statusCode != 200 || res.bodyBytes.length < 500) return;
+      final d = Directory('${_dir!.path}/covers');
+      await d.create(recursive: true);
+      await File('${d.path}/$name').writeAsBytes(res.bodyBytes);
+      _covers.add(name);
+      notifyListeners();
+    } catch (_) {
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Songs saved before covers were kept: fetch theirs now, quietly.
+  Future<void> _backfillCovers() async {
+    for (final e in _index.values.toList()) {
+      try {
+        await _saveCover(Song.fromJson(e['song']).coverArt);
+      } catch (_) {}
+    }
   }
 
   File? _lyricsFile(String id) {
@@ -283,6 +335,7 @@ class OfflineStore extends ChangeNotifier {
       try {
         await _saveLyrics(s.id);
       } catch (_) {}
+      await _saveCover(s.coverArt);
       return true;
     } catch (e) {
       if (_abort) {
@@ -306,6 +359,13 @@ class OfflineStore extends ChangeNotifier {
   Future<void> remove(String id) async {
     final e = _index.remove(id);
     if (e != null && _dir != null) {
+      try {
+        final cover = Song.fromJson(e['song']).coverArt;
+        if (cover.isNotEmpty && !_index.values.any((x) => Song.fromJson(x['song']).coverArt == cover)) {
+          final name = _coverName(cover);
+          if (_covers.remove(name)) await File('${_dir!.path}/covers/$name').delete();
+        }
+      } catch (_) {}
       try {
         await File('${_dir!.path}/${e['file']}').delete();
         final l = File('${_dir!.path}/${e['file']}.lyrics.json');
