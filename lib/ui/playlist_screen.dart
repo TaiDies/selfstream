@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../platform/platform.dart';
+import '../core/duplicates.dart';
 import '../core/models.dart';
 import '../state/library.dart';
 import '../state/offline.dart';
+import 'duplicates_screen.dart';
 import 'widgets.dart';
 
 /// A playlist stored on the server, so it is the same on every device.
@@ -105,6 +107,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               } else if (v == 'offline') {
                 if (context.mounted) context.toast('Saving ${songs.length} songs for offline');
                 await context.read<OfflineStore>().downloadAll(songs);
+              } else if (v == 'dupes') {
+                final groups = findDuplicates(songs);
+                if (groups.isEmpty) {
+                  if (context.mounted) context.toast('No duplicates in this playlist');
+                  return;
+                }
+                if (!context.mounted) return;
+                final changed = await context.open<bool>(DuplicatesScreen(playlistId: widget.playlistId, groups: groups));
+                if (changed == true) _load();
               } else if (v == 'queue') {
                 await context.player.addAllToQueue(songs);
                 if (context.mounted) context.toast('Added to queue');
@@ -113,6 +124,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'queue', child: Text('Add all to queue')),
               if (!isDesktop) const PopupMenuItem(value: 'offline', child: Text('Save all for offline')),
+              const PopupMenuItem(value: 'dupes', child: Text('Remove duplicates')),
               const PopupMenuItem(value: 'rename', child: Text('Rename')),
               const PopupMenuItem(value: 'delete', child: Text('Delete playlist')),
             ],

@@ -16,7 +16,6 @@ import 'server_screen.dart';
 import 'settings_screen.dart';
 import 'shell_navigator.dart';
 import '../state/settings.dart';
-import '../state/updater.dart';
 import 'update_dialog.dart';
 import 'widgets.dart';
 
@@ -36,10 +35,10 @@ class _ShellState extends State<Shell> {
     errors = context.read<PlayerController>().errors.listen((m) {
       if (mounted) context.toast(m);
     });
-    if (Updater.supported && context.read<Settings>().checkUpdates) {
+    if (appUpdatesSupported && context.read<Settings>().checkUpdates) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await Future<void>.delayed(const Duration(seconds: 3));
-        if (mounted) await checkForUpdate(context);
+        if (mounted) await checkForAppUpdate(context);
       });
     }
   }

@@ -143,19 +143,19 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(),
         ],
-        if (Updater.supported) ...[
+        if (appUpdatesSupported) ...[
           const SectionHeader('Updates'),
           SwitchListTile(
             secondary: const Icon(Icons.system_update_alt),
             title: const Text('Check for updates when the app starts'),
-            subtitle: Text('Build $kBuildNumber'),
+            subtitle: Text(kBuildNumber > 0 ? 'Build $kBuildNumber' : 'Updated by Google Play'),
             value: settings.checkUpdates,
             onChanged: (v) => settings.checkUpdates = v,
           ),
           ListTile(
             leading: const Icon(Icons.refresh),
             title: const Text('Check now'),
-            onTap: () => checkForUpdate(context, manual: true),
+            onTap: () => checkForAppUpdate(context, manual: true),
           ),
           const Divider(),
         ],
