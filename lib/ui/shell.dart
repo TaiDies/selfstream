@@ -203,21 +203,12 @@ class _ShellState extends State<Shell> {
   Future<void> _widgetClick(Uri? uri) async {
     if (uri == null || !mounted) return;
     final what = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : uri.host;
-    int kindTab(String kind) => _tabs.indexWhere((t) => t.kind == kind);
     switch (what) {
-      case 'shuffle-liked':
-        final songs = context.read<Library>().likedSongs;
-        if (songs.isEmpty) {
-          context.toast('No liked songs yet');
-        } else {
-          await context.read<PlayerController>().playSongs(songs, shuffle: true);
-        }
-      case 'search':
-        final i = kindTab('search');
-        if (i >= 0) goTo(i);
-      case 'library':
-        final i = kindTab('library');
-        if (i >= 0) goTo(i);
+      case 'play':
+        await _widgets?.play(uri.queryParameters['pl'] ?? '', int.tryParse(uri.queryParameters['i'] ?? '') ?? 0);
+        // started from the home screen: go back to it, the music keeps playing
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        await SystemNavigator.pop();
       case 'now-playing':
         if (context.read<PlayerController>().current != null) openNowPlaying(context);
     }

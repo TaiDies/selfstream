@@ -152,6 +152,20 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> playSong(Song s) => playSongs([s]);
 
+  /// Play a list from one song, keeping the shuffle and repeat settings you have on (home screen widget).
+  Future<void> playFromList(List<Song> songs, int start) async {
+    final wasShuffle = player.shuffleModeEnabled;
+    final wasLoop = player.loopMode;
+    await playSongs(songs, start: start);
+    try {
+      await player.setLoopMode(wasLoop);
+      if (wasShuffle) {
+        await player.setShuffleModeEnabled(true);
+        await player.shuffle();
+      }
+    } catch (_) {}
+  }
+
   Future<void> toggle() async {
     if (player.playing) {
       await player.pause();

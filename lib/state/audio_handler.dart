@@ -11,6 +11,9 @@ import 'player.dart';
 class SelfstreamAudio {
   static SelfstreamHandler? handler;
 
+  /// Set by the home screen widgets: play a song of a widget playlist.
+  static Future<void> Function(String listId, int index)? onWidgetPlay;
+
   static Future<void> init() async {
     handler = await AudioService.init(
       builder: () => SelfstreamHandler(),
@@ -160,7 +163,18 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
-    if (name == 'like') await _c?.likeCurrent();
+    switch (name) {
+      case 'like':
+        await _c?.likeCurrent();
+      case 'shuffle':
+        await _c?.toggleShuffle();
+      case 'repeat':
+        await _c?.cycleLoop();
+      case 'playlist':
+        final id = '${extras?['pl'] ?? ''}';
+        final i = (extras?['i'] as num?)?.toInt() ?? 0;
+        if (id.isNotEmpty) await SelfstreamAudio.onWidgetPlay?.call(id, i);
+    }
     return null;
   }
 }
