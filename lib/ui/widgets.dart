@@ -15,6 +15,7 @@ import 'album_screen.dart';
 import 'now_playing.dart';
 import '../platform/platform.dart';
 import 'palette.dart';
+import 'shell_navigator.dart';
 
 export 'palette.dart';
 
@@ -57,7 +58,8 @@ extension AppContext on BuildContext {
       ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 3)));
   }
 
-  Future<T?> open<T>(Widget page) => Navigator.of(this).push<T>(MaterialPageRoute<T>(builder: (_) => page));
+  /// Opens a page. On a wide screen it opens beside the side bar (see shellNavigator) so the tabs stay visible.
+  Future<T?> open<T>(Widget page) => (shellNavigator.currentState ?? Navigator.of(this)).push<T>(MaterialPageRoute<T>(builder: (_) => page));
 }
 
 String fmtDuration(int seconds) {
@@ -537,18 +539,21 @@ class VolumeControl extends StatelessWidget {
   }
 }
 
-/// A page with the mini player at the bottom.
+/// A page with the mini player at the bottom (the side-bar layout already shows one under all pages).
 class PageFrame extends StatelessWidget {
   const PageFrame({super.key, required this.title, required this.body, this.actions = const []});
   final String title;
   final Widget body;
   final List<Widget> actions;
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(title), actions: actions),
-        body: body,
-        bottomNavigationBar: const MiniPlayer(),
-      );
+  Widget build(BuildContext context) {
+    final besideSideBar = shellNavigator.currentState != null && Navigator.of(context) == shellNavigator.currentState;
+    return Scaffold(
+      appBar: AppBar(title: Text(title), actions: actions),
+      body: body,
+      bottomNavigationBar: besideSideBar ? null : const MiniPlayer(),
+    );
+  }
 }
 
 /// Play / shuffle buttons used on album, playlist and artist pages.

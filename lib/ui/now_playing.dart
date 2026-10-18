@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../platform/platform.dart';
 import '../core/models.dart';
+import '../state/desktop_window.dart';
 import '../state/library.dart';
 import '../state/offline.dart';
 import '../state/player.dart';
@@ -14,7 +15,8 @@ import 'artist_screen.dart';
 import 'widgets.dart';
 
 void openNowPlaying(BuildContext context) {
-  Navigator.of(context).push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => const NowPlayingScreen()));
+  // the root navigator, so the big player covers the side bar too
+  Navigator.of(context, rootNavigator: true).push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => const NowPlayingScreen()));
 }
 
 class NowPlayingScreen extends StatefulWidget {
@@ -117,6 +119,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 icon: Icon(Icons.speed, color: p.speed == 1.0 ? kMuted : kAccent),
                 onPressed: () => _speedDialog(context, p),
               ),
+              if (isDesktop)
+                IconButton(
+                  tooltip: 'Mini player',
+                  icon: Icon(Icons.picture_in_picture_alt_outlined, color: kMuted),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    desktopWindow.toggleMini();
+                  },
+                ),
               if (context.has('share')) IconButton(tooltip: 'Share', icon: Icon(Icons.share_outlined, color: kMuted), onPressed: () => shareSong(context, s)),
               if (context.has('playlists')) IconButton(tooltip: 'Add to playlist', icon: Icon(Icons.playlist_add, color: kMuted), onPressed: () => showPlaylistPicker(context, [s])),
               if (!isDesktop)
@@ -134,6 +145,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               ),
             ]),
           ),
+          if (isDesktop) const Padding(padding: EdgeInsets.only(bottom: 8), child: VolumeControl(width: 180)),
           if (p.sleepActive)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),

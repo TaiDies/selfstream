@@ -13,6 +13,7 @@ import 'library_screen.dart';
 import 'mini_window.dart';
 import 'search_screen.dart';
 import 'server_screen.dart';
+import 'shell_navigator.dart';
 import '../state/settings.dart';
 import '../state/updater.dart';
 import 'update_dialog.dart';
@@ -50,7 +51,15 @@ class _ShellState extends State<Shell> {
 
   List<TabSpec> _tabs = Capabilities.generic.tabs;
 
-  void goTo(int i) => setState(() => tab = i);
+  /// Bumped when the visible page or the tab list changes, so the page inside the side-bar navigator redraws.
+  final ValueNotifier<int> _rev = ValueNotifier<int>(0);
+
+  void goTo(int i) {
+    setState(() => tab = i);
+    _rev.value++;
+    // going to a tab (or tapping the open one again) returns to that tab's own page
+    shellNavigator.currentState?.popUntil((r) => r.isFirst);
+  }
 
   /// Switch to a tab by the id the server gave it.
   void goToId(String id) {
@@ -84,9 +93,11 @@ class _ShellState extends State<Shell> {
   Widget _full(BuildContext context) {
     final caps = context.watch<CapsHolder>();
     if (!caps.loaded) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    _tabs = caps.value.tabs;
+    if (!identical(_tabs, caps.value.tabs)) {
+      _tabs = caps.value.tabs;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _rev.value++);
+    }
     if (tab >= _tabs.length) tab = 0;
-    final pages = [for (final t in _tabs) _page(t)];
     final items = [for (final t in _tabs) (tabIconsFor(t.icon).$1, tabIconsFor(t.icon).$2, t.title)];
     final api = context.read<Api>();
     final banner = StreamBuilder<bool>(
@@ -108,7 +119,13 @@ class _ShellState extends State<Shell> {
             )
           : const SizedBox.shrink(),
     );
-    final body = Column(children: [banner, Expanded(child: IndexedStack(index: tab, children: pages))]);
+    Widget bodyNow() => Column(children: [banner, Expanded(child: IndexedStack(index: tab, children: [for (final t in _tabs) _page(t)]))]);
+    final body = bodyNow();
+    // on a wide screen pages opened from a tab open beside the side bar, not over it
+    final sideBody = Navigator(
+      key: shellNavigator,
+      onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => ValueListenableBuilder<int>(valueListenable: _rev, builder: (_, __, ___) => bodyNow())),
+    );
     return LayoutBuilder(builder: (context, c) {
       final wide = c.maxWidth >= 800;
       if (wide) {
@@ -148,7 +165,7 @@ class _ShellState extends State<Shell> {
                 for (final i in items) NavigationRailDestination(icon: Icon(i.$1), selectedIcon: Icon(i.$2), label: Text(i.$3)),
               ],
             ),
-            Expanded(child: body),
+            Expanded(child: sideBody),
           ]),
           bottomNavigationBar: const MiniPlayer(),
         );
