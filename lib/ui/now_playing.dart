@@ -89,7 +89,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               ),
             ]),
           ),
-          _SeekBar(player: p, song: s),
+          SeekBar(player: p, song: s),
           Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
             IconButton(icon: Icon(Icons.shuffle, color: p.shuffle ? kAccent : kMuted), onPressed: p.toggleShuffle),
             IconButton(iconSize: 38, icon: const Icon(Icons.skip_previous), onPressed: p.previous),
@@ -228,15 +228,17 @@ class _PlayButton extends StatelessWidget {
   }
 }
 
-class _SeekBar extends StatefulWidget {
-  const _SeekBar({required this.player, required this.song});
+/// Position slider with the times underneath. [compact] is the thin version used in the bottom bar.
+class SeekBar extends StatefulWidget {
+  const SeekBar({super.key, required this.player, required this.song, this.compact = false});
   final PlayerController player;
   final Song song;
+  final bool compact;
   @override
-  State<_SeekBar> createState() => _SeekBarState();
+  State<SeekBar> createState() => SeekBarState();
 }
 
-class _SeekBarState extends State<_SeekBar> {
+class SeekBarState extends State<SeekBar> {
   double? drag;
 
   @override
@@ -251,23 +253,37 @@ class _SeekBarState extends State<_SeekBar> {
           builder: (_, pSnap) {
             final pos = (pSnap.data?.inMilliseconds ?? 0).clamp(0, total > 0 ? total : 1 << 30);
             final value = drag ?? pos.toDouble();
+            final slider = Slider(
+              value: total > 0 ? value.clamp(0.0, total.toDouble()).toDouble() : 0.0,
+              max: total > 0 ? total.toDouble() : 1,
+              onChanged: total > 0 ? (v) => setState(() => drag = v) : null,
+              onChangeEnd: (v) {
+                p.seek(Duration(milliseconds: v.round()));
+                setState(() => drag = null);
+              },
+            );
+            final t = TextStyle(color: kMuted, fontSize: 12);
+            if (widget.compact) {
+              return Row(children: [
+                SizedBox(width: 40, child: Text(fmtDuration((value / 1000).round()), textAlign: TextAlign.right, style: t)),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(trackHeight: 3, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5), overlayShape: const RoundSliderOverlayShape(overlayRadius: 12)),
+                    child: slider,
+                  ),
+                ),
+                SizedBox(width: 40, child: Text(fmtDuration((total / 1000).round()), style: t)),
+              ]);
+            }
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Column(children: [
-                Slider(
-                  value: total > 0 ? value.clamp(0.0, total.toDouble()).toDouble() : 0.0,
-                  max: total > 0 ? total.toDouble() : 1,
-                  onChanged: total > 0 ? (v) => setState(() => drag = v) : null,
-                  onChangeEnd: (v) {
-                    p.seek(Duration(milliseconds: v.round()));
-                    setState(() => drag = null);
-                  },
-                ),
+                slider,
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text(fmtDuration((value / 1000).round()), style: TextStyle(color: kMuted, fontSize: 12)),
-                    Text(fmtDuration((total / 1000).round()), style: TextStyle(color: kMuted, fontSize: 12)),
+                    Text(fmtDuration((value / 1000).round()), style: t),
+                    Text(fmtDuration((total / 1000).round()), style: t),
                   ]),
                 ),
               ]),

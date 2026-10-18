@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'package:provider/provider.dart';
 
 import '../core/api.dart';
@@ -476,6 +477,7 @@ class MiniPlayer extends StatelessWidget {
     final p = context.watch<PlayerController>();
     final s = p.current;
     if (s == null) return const SizedBox.shrink();
+    if (isDesktop) return _DesktopBar(player: p, song: s);
     return Material(
       color: kCard,
       child: InkWell(
@@ -500,12 +502,73 @@ class MiniPlayer extends StatelessWidget {
                   Text(s.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: kMuted, fontSize: 12)),
                 ]),
               ),
-              if (isDesktop) const VolumeControl(),
               IconButton(icon: const Icon(Icons.skip_previous), onPressed: p.previous),
               IconButton(icon: Icon(p.playing ? Icons.pause_circle_filled : Icons.play_circle_fill, size: 36), onPressed: p.toggle),
               IconButton(icon: const Icon(Icons.skip_next), onPressed: p.next),
             ]),
           ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// The bottom bar on a computer: the song on the left, the buttons in the middle with a slider that moves
+/// through the song under them, and the volume on the right.
+class _DesktopBar extends StatelessWidget {
+  const _DesktopBar({required this.player, required this.song});
+  final PlayerController player;
+  final Song song;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = player;
+    final s = song;
+    return Material(
+      color: kCard,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(children: [
+          Expanded(
+            flex: 3,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => openNowPlaying(context),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Cover(s.coverArt, size: 52),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(s.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: kMuted, fontSize: 12)),
+                    ]),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  IconButton(icon: Icon(Icons.shuffle, size: 20, color: p.shuffle ? kAccent : kMuted), onPressed: p.toggleShuffle),
+                  IconButton(icon: const Icon(Icons.skip_previous), onPressed: p.previous),
+                  IconButton(icon: Icon(p.playing ? Icons.pause_circle_filled : Icons.play_circle_fill, size: 40), onPressed: p.toggle),
+                  IconButton(icon: const Icon(Icons.skip_next), onPressed: p.next),
+                  IconButton(
+                    icon: Icon(p.loop == LoopMode.one ? Icons.repeat_one : Icons.repeat, size: 20, color: p.loop == LoopMode.off ? kMuted : kAccent),
+                    onPressed: p.cycleLoop,
+                  ),
+                ]),
+                SeekBar(player: p, song: s, compact: true),
+              ]),
+            ),
+          ),
+          const Expanded(flex: 3, child: Align(alignment: Alignment.centerRight, child: VolumeControl())),
         ]),
       ),
     );
@@ -548,7 +611,7 @@ class PageFrame extends StatelessWidget {
   final bool miniPlayer;
   @override
   Widget build(BuildContext context) {
-    final besideSideBar = shellNavigator.currentState != null && Navigator.of(context) == shellNavigator.currentState;
+    final besideSideBar = opensBesideSideBar(context);
     return Scaffold(
       appBar: AppBar(title: Text(title), actions: actions),
       body: body,

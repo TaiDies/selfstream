@@ -10,6 +10,7 @@ import 'album_screen.dart';
 import 'artist_screen.dart';
 import 'playlist_screen.dart';
 import 'remote_playlist_screen.dart';
+import 'shell_navigator.dart';
 import 'widgets.dart';
 
 typedef TabOpener = void Function(String tabId);
@@ -46,10 +47,13 @@ IconData iconFor(String name) => switch (name) {
 
 /// A page the server described as sections. The app only knows how to draw the section types, not what they mean.
 class ServerScreen extends StatefulWidget {
-  const ServerScreen({super.key, required this.screenId, required this.title, required this.onOpenTab, this.loader});
+  const ServerScreen({super.key, required this.screenId, required this.title, required this.onOpenTab, this.loader, this.pushed = false});
   final String screenId;
   final String title;
   final TabOpener onOpenTab;
+
+  /// True when opened from a button on another page (it then has a back arrow and its own player bar).
+  final bool pushed;
 
   /// Builds the page on this device instead (used against a plain Navidrome server).
   final Future<ScreenData> Function(Api api)? loader;
@@ -110,6 +114,13 @@ class _ServerScreenState extends State<ServerScreen> with AutomaticKeepAliveClie
         widget.onOpenTab('${a['tab']}');
       case 'open':
         _open('${a['kind']}', '${a['id']}', '${a['name'] ?? ''}');
+      case 'screen':
+        context.open(ServerScreen(
+          screenId: '${a['screen']}',
+          title: '${a['title'] ?? ''}',
+          onOpenTab: widget.onOpenTab,
+          pushed: true,
+        ));
       case 'reload':
         await _load({for (final e in ((a['params'] as Map?) ?? {}).entries) '${e.key}': '${e.value}'});
       case 'randomSongs':
@@ -165,6 +176,7 @@ class _ServerScreenState extends State<ServerScreen> with AutomaticKeepAliveClie
             ),
         ],
       ),
+      bottomNavigationBar: widget.pushed && !opensBesideSideBar(context) ? const MiniPlayer() : null,
       body: ReloadOnReconnect(
         onReconnect: _load,
         child: RefreshIndicator(
