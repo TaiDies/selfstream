@@ -65,7 +65,7 @@ class _SelfstreamAppState extends State<SelfstreamApp> {
         builder: (context, s, _) {
           if (s.loaded) {
             final st = s.settings;
-            applyPalette(st.themeId, accent: Color(st.customAccent), light: st.customLight, picture: st.customPicture.isNotEmpty && File(st.customPicture).existsSync());
+            applyPalette(st.themeId, accent: Color(st.customAccent), light: st.customLight, oled: st.customOled, picture: st.customPicture.isNotEmpty && File(st.customPicture).existsSync());
           }
           if (Platform.isWindows) {
             final pal = palette;

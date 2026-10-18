@@ -171,6 +171,19 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
           value: s.customLight,
           onChanged: (v) {
             s.customLight = v;
+            if (v && s.customOled) s.customOled = false;
+            if (s.themeId != 'custom' && s.themeId != 'picture') s.themeId = 'custom';
+            _refresh();
+          },
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('OLED black'),
+          subtitle: Text(s.customLight ? 'Turn off light mode to use pure black' : 'Background is always pure black, whatever color you pick'),
+          value: s.customOled,
+          onChanged: (v) {
+            s.customOled = v;
+            if (v && s.customLight) s.customLight = false;
             if (s.themeId != 'custom' && s.themeId != 'picture') s.themeId = 'custom';
             _refresh();
           },

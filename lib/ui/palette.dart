@@ -36,7 +36,7 @@ AppPalette get palette => _current;
 AppPalette paletteById(String id) => palettes.firstWhere((p) => p.id == id, orElse: () => palettes.first);
 
 /// A theme made from one colour: the background, panels and text colours are tinted to match it.
-AppPalette customPalette(Color accent, {bool light = false, bool picture = false}) {
+AppPalette customPalette(Color accent, {bool light = false, bool picture = false, bool oled = false}) {
   final h = HSLColor.fromColor(accent);
   Color tone(double s, double l) => HSLColor.fromAHSL(1, h.hue, s, l).toColor();
   final a = light ? h.withLightness(h.lightness.clamp(0.25, 0.40)).toColor() : h.withLightness(h.lightness.clamp(0.5, 0.72)).toColor();
@@ -44,14 +44,18 @@ AppPalette customPalette(Color accent, {bool light = false, bool picture = false
     return AppPalette(picture ? 'picture' : 'custom', 'Custom', a, tone(0.3, 0.96), picture ? Colors.white.withValues(alpha: 0.7) : Colors.white,
         picture ? Colors.white.withValues(alpha: 0.8) : Colors.white, tone(0.12, 0.40), light: true, picture: picture);
   }
+  if (oled) {
+    return AppPalette(picture ? 'picture' : 'custom', 'Custom', a, Colors.black, picture ? tone(0.20, 0.07).withValues(alpha: 0.62) : tone(0.20, 0.07),
+        Colors.black, tone(0.15, 0.66), picture: picture);
+  }
   return AppPalette(picture ? 'picture' : 'custom', 'Custom', a, tone(0.30, 0.06), picture ? tone(0.28, 0.11).withValues(alpha: 0.62) : tone(0.28, 0.11),
       picture ? tone(0.30, 0.08).withValues(alpha: 0.78) : tone(0.30, 0.08), tone(0.15, 0.66), picture: picture);
 }
 
 /// Picks the current theme. 'custom' and 'picture' are the user's own colour theme (with a picture behind it for 'picture').
-void applyPalette(String id, {Color? accent, bool light = false, bool picture = false}) {
+void applyPalette(String id, {Color? accent, bool light = false, bool picture = false, bool oled = false}) {
   if (id == 'custom' || id == 'picture') {
-    _current = customPalette(accent ?? palettes.first.accent, light: light, picture: id == 'picture' && picture);
+    _current = customPalette(accent ?? palettes.first.accent, light: light, oled: oled, picture: id == 'picture' && picture);
   } else {
     _current = paletteById(id);
   }

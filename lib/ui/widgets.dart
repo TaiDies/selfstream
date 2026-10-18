@@ -524,10 +524,12 @@ class _DesktopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = player;
     final s = song;
-    return Material(
+    return SizedBox(
+      height: 96,
+      child: Material(
       color: kCard,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Row(children: [
           Expanded(
             flex: 3,
@@ -571,6 +573,7 @@ class _DesktopBar extends StatelessWidget {
           ),
           const Expanded(flex: 3, child: Align(alignment: Alignment.centerRight, heightFactor: 1, child: VolumeControl())),
         ]),
+      ),
       ),
     );
   }

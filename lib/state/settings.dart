@@ -34,6 +34,13 @@ class Settings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Pure black background (saves power on OLED screens), whatever colour is picked.
+  bool get customOled => _p.getBool('customOled') ?? false;
+  set customOled(bool v) {
+    _p.setBool('customOled', v);
+    notifyListeners();
+  }
+
   /// Path of the picture on this device ('' = none).
   String get customPicture => _p.getString('customPicture') ?? '';
   set customPicture(String v) {
