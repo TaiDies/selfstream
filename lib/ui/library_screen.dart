@@ -9,6 +9,7 @@ import '../state/offline.dart';
 import 'album_screen.dart';
 import 'artist_screen.dart';
 import 'playlist_screen.dart';
+import 'download_controls.dart';
 import 'widgets.dart';
 
 class LibraryScreen extends StatelessWidget {
@@ -127,8 +128,9 @@ class _LikedTab extends StatelessWidget {
     if (songs.isEmpty) return const EmptyNote('Songs you like show up here. Liking a song saves it here on every device.', icon: Icons.favorite_border);
     final off = context.watch<OfflineStore>();
     final saved = songs.where((s) => off.has(s.id)).length;
-    final busy = off.progress.isNotEmpty;
+    final busy = off.busy;
     return ListView(children: [
+      if (!isDesktop) const DownloadControls(),
       PlayButtons(songs: songs, extra: [
         if (!isDesktop)
         OutlinedButton.icon(
@@ -291,10 +293,11 @@ class _OfflineTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final off = context.watch<OfflineStore>();
     final songs = off.songs;
-    if (songs.isEmpty && off.progress.isEmpty) {
+    if (songs.isEmpty && !off.busy) {
       return const EmptyNote('Songs you save for offline listening live on this device only. Use the menu on any song.', icon: Icons.download_for_offline_outlined);
     }
     return ListView(children: [
+      const DownloadControls(),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
         child: Row(children: [

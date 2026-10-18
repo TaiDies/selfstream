@@ -1,9 +1,20 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:ui' show IsolateNameServer;
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'offline.dart';
+
+const _portName = 'selfstream_download_actions';
+
+/// Notification buttons are delivered on a background isolate; hand them to the app's main isolate, which owns the downloads.
+@pragma('vm:entry-point')
+void downloadActionFromBackground(NotificationResponse r) {
+  final id = r.actionId;
+  if (id != null) IsolateNameServer.lookupPortByName(_portName)?.send(id);
+}
 
 /// Android: shows download progress as a notification and keeps the app alive while songs are being saved.
 /// Every call is wrapped so a notification problem can never break a download.
@@ -16,6 +27,8 @@ class DownloadNotice {
   static const _channel = 'dev.selfstream.downloads';
 
   final _plugin = FlutterLocalNotificationsPlugin();
+  final _port = ReceivePort();
+  bool _wasPaused = false;
   bool _ready = false;
   bool _foreground = false;
   bool _finishing = false;
@@ -24,15 +37,37 @@ class DownloadNotice {
   Future<void> start() async {
     if (!Platform.isAndroid) return;
     try {
-      await _plugin.initialize(const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_stat_selfstream')));
+      await _plugin.initialize(
+        const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_stat_selfstream')),
+        onDidReceiveNotificationResponse: (r) => _action(r.actionId),
+        onDidReceiveBackgroundNotificationResponse: downloadActionFromBackground,
+      );
+      IsolateNameServer.removePortNameMapping(_portName);
+      IsolateNameServer.registerPortWithName(_port.sendPort, _portName);
+      _port.listen((m) => _action(m as String?));
       _ready = true;
       store.addListener(_changed);
     } catch (_) {}
   }
 
-  void dispose() => store.removeListener(_changed);
+  void dispose() {
+    store.removeListener(_changed);
+    IsolateNameServer.removePortNameMapping(_portName);
+    _port.close();
+  }
 
-  AndroidNotificationDetails _details({required bool progress, int value = 0}) => AndroidNotificationDetails(
+  void _action(String? id) {
+    switch (id) {
+      case 'pause':
+        store.pause();
+      case 'resume':
+        store.resume();
+      case 'stop':
+        store.stopAll();
+    }
+  }
+
+  AndroidNotificationDetails _details({required bool progress, int value = 0, bool paused = false}) => AndroidNotificationDetails(
         _channel,
         'Downloads',
         channelDescription: 'Progress of songs being saved on this device',
@@ -45,6 +80,12 @@ class DownloadNotice {
         ongoing: progress,
         onlyAlertOnce: true,
         autoCancel: !progress,
+        actions: progress
+            ? [
+                AndroidNotificationAction(paused ? 'resume' : 'pause', paused ? 'Resume' : 'Pause'),
+                const AndroidNotificationAction('stop', 'Stop'),
+              ]
+            : null,
       );
 
   void _changed() {
@@ -58,7 +99,9 @@ class DownloadNotice {
 
   Future<void> _update() async {
     final now = DateTime.now();
-    if (_foreground && now.difference(_last).inMilliseconds < 800) return;
+    final paused = store.paused;
+    if (_foreground && paused == _wasPaused && now.difference(_last).inMilliseconds < 800) return;
+    _wasPaused = paused;
     _last = now;
     try {
       final total = store.batchTotal == 0 ? 1 : store.batchTotal;
@@ -67,8 +110,8 @@ class DownloadNotice {
         part += v;
       }
       final fraction = ((store.batchDone + part) / total).clamp(0.0, 1.0);
-      final details = _details(progress: true, value: (fraction * 1000).round());
-      const title = 'Downloading songs';
+      final details = _details(progress: true, value: (fraction * 1000).round(), paused: paused);
+      final title = paused ? 'Downloads paused' : 'Downloading songs';
       final body = '${(store.batchDone + 1).clamp(1, total)} of $total';
       if (!_foreground) {
         _foreground = true;

@@ -13,6 +13,7 @@ import '../state/session.dart';
 import '../state/background_setup.dart';
 import '../state/settings.dart';
 import '../state/updater.dart';
+import 'download_controls.dart';
 import 'theme_editor.dart';
 import 'update_dialog.dart';
 import 'widgets.dart';
@@ -183,6 +184,7 @@ class SettingsScreen extends StatelessWidget {
         ],
         if (!isDesktop) ...[
         const SectionHeader('Storage on this device'),
+        const DownloadControls(),
         ListTile(
           leading: const Icon(Icons.download_for_offline_outlined),
           title: const Text('Offline songs'),

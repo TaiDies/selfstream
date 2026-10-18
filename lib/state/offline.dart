@@ -22,11 +22,46 @@ class OfflineStore extends ChangeNotifier {
   final Map<String, double> progress = {}; // song id -> 0..1 while downloading
   final Map<String, String> failed = {};
 
-  // The current run of downloads, for the status notification.
+  // The current run of downloads (a queue worked through one song at a time), for the controls and the notification.
   int batchTotal = 0, batchDone = 0, batchFailed = 0;
-  int _pending = 0;
-  bool get busy => _pending > 0;
+  final List<_Job> _queue = [];
+  _Job? _current;
+  bool paused = false;
+  bool _running = false;
+  bool _abort = false;
+  Completer<void>? _resume;
+  bool get busy => _running || _queue.isNotEmpty;
   void resetBatch() => batchTotal = batchDone = batchFailed = 0;
+
+  /// Stop after interrupting the song in progress; it starts over from the beginning when resumed.
+  void pause() {
+    if (!busy || paused) return;
+    paused = true;
+    _abort = true;
+    notifyListeners();
+  }
+
+  void resume() {
+    if (!paused) return;
+    paused = false;
+    _resume?.complete();
+    notifyListeners();
+  }
+
+  /// Cancel everything that has not finished. Songs already saved stay.
+  void stopAll() {
+    if (!busy) return;
+    for (final j in _queue) {
+      j.done.complete();
+    }
+    _queue.clear();
+    batchTotal = batchDone;
+    _current?.cancelled = true;
+    _abort = true;
+    paused = false;
+    _resume?.complete();
+    notifyListeners();
+  }
 
   Future<void> load() async {
     if (isDesktop) {
@@ -158,33 +193,65 @@ class OfflineStore extends ChangeNotifier {
     await File('${_dir!.path}/index.json').writeAsString(jsonEncode(_index));
   }
 
-  Future<void> download(Song s) async {
-    if (_dir == null || has(s.id) || progress.containsKey(s.id)) return;
+  Future<void> download(Song s) => _enqueue(s);
+
+  Future<void> downloadAll(Iterable<Song> songs) => Future.wait(songs.map(_enqueue).toList());
+
+  Future<void> _enqueue(Song s) {
+    if (_dir == null || has(s.id) || (_current?.song.id == s.id) || _queue.any((j) => j.song.id == s.id)) return Future.value();
     if (!busy) resetBatch();
+    final job = _Job(s);
+    _queue.add(job);
     batchTotal++;
-    _pending++;
-    await _run(s);
+    notifyListeners();
+    if (!_running) {
+      _running = true;
+      unawaited(_drain());
+    }
+    return job.done.future;
   }
 
-  Future<void> _run(Song s) async {
+  Future<void> _drain() async {
     try {
-      await _fetch(s);
+      while (_queue.isNotEmpty) {
+        if (paused) {
+          _resume = Completer<void>();
+          await _resume!.future;
+          continue;
+        }
+        final job = _queue.removeAt(0);
+        _current = job;
+        _abort = false;
+        final finished = await _fetch(job.song);
+        _current = null;
+        if (!finished && !job.cancelled) {
+          _queue.insert(0, job); // paused mid-song: start it again on resume
+          continue;
+        }
+        if (!job.cancelled) {
+          if (failed.containsKey(job.song.id)) batchFailed++;
+          batchDone++;
+        }
+        job.done.complete();
+        notifyListeners();
+      }
     } finally {
-      if (failed.containsKey(s.id)) batchFailed++;
-      batchDone++;
-      _pending--;
+      _running = false;
+      _current = null;
       notifyListeners();
     }
   }
 
-  Future<void> _fetch(Song s) async {
-    if (_dir == null || has(s.id) || progress.containsKey(s.id)) return;
+  /// Saves one song. Returns false if it was interrupted (paused or stopped) before it finished.
+  Future<bool> _fetch(Song s) async {
+    if (_dir == null || has(s.id)) return true;
     progress[s.id] = 0;
     failed.remove(s.id);
     notifyListeners();
     final name = '${s.id.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.audio';
     final file = File('${_dir!.path}/$name');
     final client = http.Client();
+    var interrupted = false;
     try {
       final res = await client.send(http.Request('GET', api.streamUri(s.id, maxBitRate: settings.maxBitRate)));
       if (res.statusCode >= 300) throw ApiException('Server answered ${res.statusCode}');
@@ -192,6 +259,10 @@ class OfflineStore extends ChangeNotifier {
       var received = 0;
       final total = res.contentLength ?? 0;
       await for (final chunk in res.stream) {
+        if (_abort) {
+          interrupted = true;
+          break;
+        }
         sink.add(chunk);
         received += chunk.length;
         if (total > 0) {
@@ -200,33 +271,35 @@ class OfflineStore extends ChangeNotifier {
         }
       }
       await sink.close();
+      if (interrupted) {
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+        return false;
+      }
       if (received < 1000) throw ApiException('Empty answer');
       _index[s.id] = {'file': name, 'song': s.toJson()};
       await _saveIndex();
       try {
         await _saveLyrics(s.id);
       } catch (_) {}
+      return true;
     } catch (e) {
+      if (_abort) {
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+        return false;
+      }
       failed[s.id] = e.toString();
       try {
         if (await file.exists()) await file.delete();
       } catch (_) {}
+      return true;
     } finally {
       client.close();
       progress.remove(s.id);
       notifyListeners();
-    }
-  }
-
-  Future<void> downloadAll(Iterable<Song> songs) async {
-    final fresh = songs.where((s) => _dir != null && !has(s.id) && !progress.containsKey(s.id)).toList();
-    if (fresh.isEmpty) return;
-    if (!busy) resetBatch();
-    batchTotal += fresh.length;
-    _pending += fresh.length;
-    notifyListeners();
-    for (final s in fresh) {
-      await _run(s);
     }
   }
 
@@ -248,4 +321,11 @@ class OfflineStore extends ChangeNotifier {
       await remove(id);
     }
   }
+}
+
+class _Job {
+  _Job(this.song);
+  final Song song;
+  final Completer<void> done = Completer<void>();
+  bool cancelled = false;
 }
