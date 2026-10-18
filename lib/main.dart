@@ -9,6 +9,7 @@ import 'core/api.dart';
 import 'platform/platform.dart';
 import 'platform/title_bar.dart';
 import 'state/desktop_window.dart';
+import 'state/global_hotkeys.dart';
 import 'state/caps_holder.dart';
 import 'state/library.dart';
 import 'state/offline.dart';
@@ -32,6 +33,7 @@ Future<void> main() async {
   } else if (isDesktop) {
     JustAudioMediaKit.ensureInitialized(windows: Platform.isWindows, linux: Platform.isLinux, macOS: Platform.isMacOS);
     await DesktopWindow.init();
+    if (Platform.isWindows) await setupNotifications();
   }
   runApp(const SelfstreamApp());
 }

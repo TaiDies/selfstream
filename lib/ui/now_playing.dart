@@ -318,10 +318,12 @@ class _LyricsViewState extends State<LyricsView> {
   int lastActive = -1;
   StreamSubscription<Duration>? sub;
   bool _following = false;
+  final ValueNotifier<Duration> _pos = ValueNotifier(Duration.zero); // for word-by-word highlighting
 
   @override
   void dispose() {
     sub?.cancel();
+    _pos.dispose();
     scroll.dispose();
     super.dispose();
   }
@@ -330,6 +332,7 @@ class _LyricsViewState extends State<LyricsView> {
     if (_following || !l.synced) return;
     _following = true;
     sub = widget.player.positionStream.listen((pos) {
+      if (l.hasWords) _pos.value = pos;
       var active = -1;
       for (var i = 0; i < l.lines.length; i++) {
         if (l.lines[i].start <= pos) {
@@ -385,6 +388,13 @@ class _LyricsViewState extends State<LyricsView> {
               ],
             ),
           ),
+          if (l.source.isNotEmpty)
+            Positioned(
+              left: 12,
+              right: 48,
+              bottom: 4,
+              child: Text(l.source, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: kMuted.withValues(alpha: 0.7), fontSize: 11)),
+            ),
           Positioned(
             right: 4,
             top: 0,
@@ -397,6 +407,32 @@ class _LyricsViewState extends State<LyricsView> {
         ]);
       },
     );
+  }
+
+  /// The line being sung: each word fills in as it is reached.
+  Widget _wordLine(LyricLine line, Settings st, TextAlign align) {
+    final lit = st.lyricsAccent ? kAccent : kText;
+    final unsung = kText.withValues(alpha: st.lyricsDim);
+    return ValueListenableBuilder<Duration>(
+      valueListenable: _pos,
+      builder: (_, pos, __) => Text.rich(
+        TextSpan(children: [
+          for (final w in line.words)
+            TextSpan(
+              text: w.text,
+              style: TextStyle(color: Color.lerp(unsung, lit, _progress(w, pos))),
+            ),
+        ]),
+        textAlign: align,
+      ),
+    );
+  }
+
+  static double _progress(LyricWord w, Duration pos) {
+    if (pos >= w.end) return 1;
+    if (pos <= w.start) return 0;
+    final span = (w.end - w.start).inMilliseconds;
+    return span <= 0 ? 1 : (pos - w.start).inMilliseconds / span;
   }
 
   Widget _line(Lyrics l, int i, Settings st, TextAlign align) {
@@ -419,7 +455,9 @@ class _LyricsViewState extends State<LyricsView> {
               height: 1.25,
               color: color,
             ),
-            child: Text(l.lines[i].text.isEmpty ? '...' : l.lines[i].text, textAlign: align),
+            child: active && l.lines[i].words.isNotEmpty
+                ? _wordLine(l.lines[i], st, align)
+                : Text(l.lines[i].text.isEmpty ? '...' : l.lines[i].text, textAlign: align),
           ),
         ),
       ),

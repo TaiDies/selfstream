@@ -62,6 +62,19 @@ class Settings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Shortcuts that work from anywhere in Windows (JSON, see global_hotkeys.dart). Empty = all defaults.
+  String get globalHotkeys => _p.getString('globalHotkeys') ?? '';
+  set globalHotkeys(String v) {
+    _p.setString('globalHotkeys', v);
+    notifyListeners();
+  }
+
+  bool get globalHotkeysOn => _p.getBool('globalHotkeysOn') ?? true;
+  set globalHotkeysOn(bool v) {
+    _p.setBool('globalHotkeysOn', v);
+    notifyListeners();
+  }
+
   List<String> get recentSearches => List<String>.of(_p.getStringList('recentSearches') ?? const <String>[]);
 
   void addRecentSearch(String q) {

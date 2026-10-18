@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,7 +7,9 @@ import 'package:provider/provider.dart';
 import '../core/api.dart';
 import '../platform/platform.dart';
 import '../state/desktop_window.dart';
+import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
+import '../state/library.dart';
 import '../state/player.dart';
 import '../core/caps.dart';
 import '../state/caps_holder.dart';
@@ -31,6 +34,7 @@ class _ShellState extends State<Shell> {
   int tab = 0;
   StreamSubscription<String>? errors;
   HotkeyService? _hotkeys;
+  GlobalHotkeyService? _globalHotkeys;
 
   @override
   void initState() {
@@ -39,11 +43,44 @@ class _ShellState extends State<Shell> {
       if (mounted) context.toast(m);
     });
     if (isDesktop) _hotkeys = HotkeyService(settings: context.read<Settings>(), run: _hotkey)..start();
+    if (Platform.isWindows) _globalHotkeys = GlobalHotkeyService(settings: context.read<Settings>(), run: _globalHotkey)..start();
     if (appUpdatesSupported && context.read<Settings>().checkUpdates) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await Future<void>.delayed(const Duration(seconds: 3));
         if (mounted) await checkForAppUpdate(context);
       });
+    }
+  }
+
+  /// The shortcuts that work from anywhere in Windows.
+  Future<void> _globalHotkey(GlobalAction a) async {
+    if (!mounted) return;
+    final p = context.read<PlayerController>();
+    switch (a) {
+      case GlobalAction.playPause:
+        await p.toggle();
+      case GlobalAction.next:
+        await p.next();
+      case GlobalAction.previous:
+        await p.previous();
+      case GlobalAction.volumeUp:
+        await p.setVolume((p.volume + 0.05).clamp(0.0, 1.0));
+      case GlobalAction.volumeDown:
+        await p.setVolume((p.volume - 0.05).clamp(0.0, 1.0));
+      case GlobalAction.like:
+        final s = p.current;
+        if (s == null) {
+          await notify('Nothing is playing', 'Start a song, then press the like shortcut again.');
+          return;
+        }
+        final lib = context.read<Library>();
+        final was = lib.isLiked(s);
+        try {
+          await lib.toggleLike(s);
+          await notify(was ? 'Removed from liked songs' : 'Added to liked songs', '${s.title} · ${s.artist}');
+        } catch (e) {
+          await notify('Could not update liked songs', '$e');
+        }
     }
   }
 
@@ -89,6 +126,7 @@ class _ShellState extends State<Shell> {
   @override
   void dispose() {
     _hotkeys?.stop();
+    unawaited(_globalHotkeys?.stop() ?? Future<void>.value());
     errors?.cancel();
     super.dispose();
   }

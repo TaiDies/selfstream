@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../platform/platform.dart';
+import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
 import '../state/offline.dart';
 import '../state/presence.dart';
@@ -150,6 +153,17 @@ class SettingsScreen extends StatelessWidget {
           _ShortcutsList(settings: settings),
           const Divider(),
         ],
+        if (Platform.isWindows) ...[
+          const SectionHeader('System-wide shortcuts'),
+          SwitchListTile(
+            title: const Text('Work from any program'),
+            subtitle: const Text('Control Selfstream and like songs while another window is in front'),
+            value: settings.globalHotkeysOn,
+            onChanged: (v) => settings.globalHotkeysOn = v,
+          ),
+          if (settings.globalHotkeysOn) _GlobalShortcutsList(settings: settings),
+          const Divider(),
+        ],
         if (appUpdatesSupported) ...[
           const SectionHeader('Updates'),
           SwitchListTile(
@@ -280,6 +294,93 @@ class _ShortcutsList extends StatelessWidget {
         title: const Text('Reset shortcuts to the defaults'),
         subtitle: Text('Media keys on your keyboard always work.', style: TextStyle(color: kMuted, fontSize: 12)),
         onTap: () => settings.hotkeys = '',
+      ),
+    ]);
+  }
+}
+
+
+/// Shortcuts that work from anywhere in Windows. They need Ctrl, Alt or Shift so they cannot take over a plain key.
+class _GlobalShortcutsList extends StatelessWidget {
+  const _GlobalShortcutsList({required this.settings});
+  final Settings settings;
+
+  Future<void> _change(BuildContext context, GlobalAction a, Map<GlobalAction, GlobalCombo?> map) async {
+    GlobalHotkeyService.capturing = true;
+    HotkeyService.capturing = true;
+    GlobalCombo? picked;
+    var clear = false;
+    try {
+      picked = await showDialog<GlobalCombo>(
+        context: context,
+        builder: (d) => Focus(
+          autofocus: true,
+          onKeyEvent: (node, e) {
+            if (e is! KeyDownEvent) return KeyEventResult.handled;
+            final k = e.logicalKey;
+            if (k == LogicalKeyboardKey.escape) {
+              Navigator.of(d).pop();
+              return KeyEventResult.handled;
+            }
+            if (k == LogicalKeyboardKey.backspace || k == LogicalKeyboardKey.delete) {
+              clear = true;
+              Navigator.of(d).pop();
+              return KeyEventResult.handled;
+            }
+            if (Combo.isModifier(k)) return KeyEventResult.handled;
+            Navigator.of(d).pop(GlobalCombo.fromEvent(e));
+            return KeyEventResult.handled;
+          },
+          child: AlertDialog(
+            title: Text(globalTitles[a]!),
+            content: const Text('Press the keys you want to use, with Ctrl, Alt or Shift.\n\nBackspace removes the shortcut. Esc cancels.'),
+          ),
+        ),
+      );
+    } finally {
+      GlobalHotkeyService.capturing = false;
+      HotkeyService.capturing = false;
+    }
+    if (!context.mounted) return;
+    if (clear) {
+      settings.globalHotkeys = globalHotkeysToRaw({...map, a: null});
+      return;
+    }
+    if (picked == null) return;
+    if (!picked.hasModifier) {
+      context.toast('Use Ctrl, Alt or Shift together with the key');
+      return;
+    }
+    for (final other in map.entries) {
+      if (other.key != a && other.value == picked) {
+        context.toast('${picked.text} is already used for "${globalTitles[other.key]}"');
+        return;
+      }
+    }
+    settings.globalHotkeys = globalHotkeysToRaw({...map, a: picked});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final map = globalHotkeysFrom(settings.globalHotkeys);
+    return Column(children: [
+      for (final a in GlobalAction.values)
+        ListTile(
+          dense: true,
+          title: Text(globalTitles[a]!),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: kFaint)),
+            child: Text(map[a]?.text ?? 'None', style: TextStyle(color: map[a] == null ? kMuted : kText, fontSize: 13)),
+          ),
+          onTap: () => _change(context, a, map),
+        ),
+      ListTile(
+        dense: true,
+        leading: const Icon(Icons.restart_alt),
+        title: const Text('Reset to the defaults'),
+        subtitle: Text('If another program already uses a combination, pick a different one here.', style: TextStyle(color: kMuted, fontSize: 12)),
+        onTap: () => settings.globalHotkeys = '',
       ),
     ]);
   }

@@ -250,10 +250,16 @@ class Api {
     final lines = <LyricLine>[];
     for (final raw in (synced['line'] as List? ?? [])) {
       final l = _asMap(raw);
-      lines.add(LyricLine(Duration(milliseconds: (l['start'] as num?)?.toInt() ?? 0), '${l['value'] ?? ''}'));
+      final words = <LyricWord>[];
+      for (final w in (l['words'] as List? ?? [])) {
+        final m = _asMap(w);
+        final s = (m['start'] as num?)?.toInt() ?? 0;
+        words.add(LyricWord(Duration(milliseconds: s), Duration(milliseconds: (m['end'] as num?)?.toInt() ?? s), '${m['value'] ?? ''}'));
+      }
+      lines.add(LyricLine(Duration(milliseconds: (l['start'] as num?)?.toInt() ?? 0), '${l['value'] ?? ''}', words));
     }
     if (lines.isEmpty) return null;
-    return Lyrics(lines, synced['synced'] == true);
+    return Lyrics(lines, synced['synced'] == true, '${synced['source'] ?? ''}');
   }
 
   Future<Lyrics?> lyrics(String id) async => parseLyrics(await lyricsRaw(id));

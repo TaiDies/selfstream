@@ -204,16 +204,27 @@ class DiscoverData {
   }
 }
 
-class LyricLine {
-  const LyricLine(this.start, this.text);
+/// One word (or syllable) of a line, with the time it is sung.
+class LyricWord {
+  const LyricWord(this.start, this.end, this.text);
   final Duration start;
+  final Duration end;
   final String text;
 }
 
+class LyricLine {
+  const LyricLine(this.start, this.text, [this.words = const []]);
+  final Duration start;
+  final String text;
+  final List<LyricWord> words; // empty when the lyrics only have line timing
+}
+
 class Lyrics {
-  const Lyrics(this.lines, this.synced);
+  const Lyrics(this.lines, this.synced, [this.source = '']);
   final List<LyricLine> lines;
   final bool synced;
+  final String source; // credit line to show when the lyrics come from a community source
+  bool get hasWords => lines.any((l) => l.words.isNotEmpty);
 }
 
 class SearchResults {
