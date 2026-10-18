@@ -14,9 +14,18 @@ import '../state/settings.dart';
 import 'artist_screen.dart';
 import 'widgets.dart';
 
+bool _nowPlayingOpen = false;
+
+/// Opens the big player (or closes it when it is already open, for the keyboard shortcut).
 void openNowPlaying(BuildContext context) {
+  final nav = Navigator.of(context, rootNavigator: true);
+  if (_nowPlayingOpen) {
+    nav.maybePop();
+    return;
+  }
+  _nowPlayingOpen = true;
   // the root navigator, so the big player covers the side bar too
-  Navigator.of(context, rootNavigator: true).push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => const NowPlayingScreen()));
+  nav.push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => const NowPlayingScreen())).whenComplete(() => _nowPlayingOpen = false);
 }
 
 class NowPlayingScreen extends StatefulWidget {

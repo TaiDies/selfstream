@@ -48,6 +48,13 @@ class Settings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Keyboard shortcuts the user changed (JSON, see hotkeys.dart). Empty = all defaults.
+  String get hotkeys => _p.getString('hotkeys') ?? '';
+  set hotkeys(String v) {
+    _p.setString('hotkeys', v);
+    notifyListeners();
+  }
+
   List<String> get recentSearches => List<String>.of(_p.getStringList('recentSearches') ?? const <String>[]);
 
   void addRecentSearch(String q) {

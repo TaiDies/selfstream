@@ -533,6 +533,7 @@ class _DesktopBar extends StatelessWidget {
             flex: 3,
             child: Align(
               alignment: Alignment.centerLeft,
+              heightFactor: 1,
               child: InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => openNowPlaying(context),
@@ -568,7 +569,7 @@ class _DesktopBar extends StatelessWidget {
               ]),
             ),
           ),
-          const Expanded(flex: 3, child: Align(alignment: Alignment.centerRight, child: VolumeControl())),
+          const Expanded(flex: 3, child: Align(alignment: Alignment.centerRight, heightFactor: 1, child: VolumeControl())),
         ]),
       ),
     );

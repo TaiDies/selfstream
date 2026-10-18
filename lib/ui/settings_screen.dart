@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../platform/platform.dart';
+import '../state/hotkeys.dart';
 import '../state/offline.dart';
 import '../state/presence.dart';
 import '../state/session.dart';
@@ -143,6 +145,11 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(),
         ],
+        if (isDesktop) ...[
+          const SectionHeader('Keyboard shortcuts'),
+          _ShortcutsList(settings: settings),
+          const Divider(),
+        ],
         if (appUpdatesSupported) ...[
           const SectionHeader('Updates'),
           SwitchListTile(
@@ -193,5 +200,87 @@ class SettingsScreen extends StatelessWidget {
         ),
       ]),
     );
+  }
+}
+
+
+/// The list of shortcuts; tap one, then press the new keys.
+class _ShortcutsList extends StatelessWidget {
+  const _ShortcutsList({required this.settings});
+  final Settings settings;
+
+  Future<void> _change(BuildContext context, HotkeyAction a, Map<HotkeyAction, Combo?> map) async {
+    HotkeyService.capturing = true;
+    Combo? picked;
+    var clear = false;
+    try {
+      picked = await showDialog<Combo>(
+        context: context,
+        builder: (d) => Focus(
+          autofocus: true,
+          onKeyEvent: (node, e) {
+            if (e is! KeyDownEvent) return KeyEventResult.handled;
+            final k = e.logicalKey;
+            if (k == LogicalKeyboardKey.escape) {
+              Navigator.of(d).pop();
+              return KeyEventResult.handled;
+            }
+            if (k == LogicalKeyboardKey.backspace || k == LogicalKeyboardKey.delete) {
+              clear = true;
+              Navigator.of(d).pop();
+              return KeyEventResult.handled;
+            }
+            if (Combo.isModifier(k)) return KeyEventResult.handled;
+            final kb = HardwareKeyboard.instance;
+            Navigator.of(d).pop(Combo(k, ctrl: kb.isControlPressed, shift: kb.isShiftPressed, alt: kb.isAltPressed));
+            return KeyEventResult.handled;
+          },
+          child: AlertDialog(
+            title: Text(hotkeyTitles[a]!),
+            content: const Text('Press the keys you want to use.\n\nBackspace removes the shortcut. Esc cancels.'),
+          ),
+        ),
+      );
+    } finally {
+      HotkeyService.capturing = false;
+    }
+    if (!context.mounted) return;
+    if (clear) {
+      settings.hotkeys = hotkeysToRaw({...map, a: null});
+      return;
+    }
+    if (picked == null) return;
+    for (final other in map.entries) {
+      if (other.key != a && other.value == picked) {
+        context.toast('${picked.label} is already used for "${hotkeyTitles[other.key]}"');
+        return;
+      }
+    }
+    settings.hotkeys = hotkeysToRaw({...map, a: picked});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final map = hotkeysFrom(settings.hotkeys);
+    return Column(children: [
+      for (final a in HotkeyAction.values)
+        ListTile(
+          dense: true,
+          title: Text(hotkeyTitles[a]!),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: kFaint)),
+            child: Text(map[a]?.label ?? 'None', style: TextStyle(color: map[a] == null ? kMuted : kText, fontSize: 13)),
+          ),
+          onTap: () => _change(context, a, map),
+        ),
+      ListTile(
+        dense: true,
+        leading: const Icon(Icons.restart_alt),
+        title: const Text('Reset shortcuts to the defaults'),
+        subtitle: Text('Media keys on your keyboard always work.', style: TextStyle(color: kMuted, fontSize: 12)),
+        onTap: () => settings.hotkeys = '',
+      ),
+    ]);
   }
 }

@@ -6,10 +6,12 @@ import 'package:provider/provider.dart';
 import '../core/api.dart';
 import '../platform/platform.dart';
 import '../state/desktop_window.dart';
+import '../state/hotkeys.dart';
 import '../state/player.dart';
 import '../core/caps.dart';
 import '../state/caps_holder.dart';
 import 'library_screen.dart';
+import 'now_playing.dart';
 import 'mini_window.dart';
 import 'search_screen.dart';
 import 'server_screen.dart';
@@ -28,6 +30,7 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int tab = 0;
   StreamSubscription<String>? errors;
+  HotkeyService? _hotkeys;
 
   @override
   void initState() {
@@ -35,6 +38,7 @@ class _ShellState extends State<Shell> {
     errors = context.read<PlayerController>().errors.listen((m) {
       if (mounted) context.toast(m);
     });
+    if (isDesktop) _hotkeys = HotkeyService(settings: context.read<Settings>(), run: _hotkey)..start();
     if (appUpdatesSupported && context.read<Settings>().checkUpdates) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await Future<void>.delayed(const Duration(seconds: 3));
@@ -43,8 +47,48 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  void _hotkey(HotkeyAction a) {
+    if (!mounted) return;
+    final p = context.read<PlayerController>();
+    switch (a) {
+      case HotkeyAction.playPause:
+        p.toggle();
+      case HotkeyAction.next:
+        p.next();
+      case HotkeyAction.previous:
+        p.previous();
+      case HotkeyAction.seekForward:
+      case HotkeyAction.seekBack:
+        final total = p.player.duration ?? Duration(seconds: p.current?.duration ?? 0);
+        var to = p.player.position + Duration(seconds: a == HotkeyAction.seekForward ? 10 : -10);
+        if (to < Duration.zero) to = Duration.zero;
+        if (total > Duration.zero && to > total) to = total;
+        p.seek(to);
+      case HotkeyAction.volumeUp:
+        p.setVolume((p.volume + 0.05).clamp(0.0, 1.0));
+      case HotkeyAction.volumeDown:
+        p.setVolume((p.volume - 0.05).clamp(0.0, 1.0));
+      case HotkeyAction.mute:
+        p.setVolume(p.volume == 0 ? 0.7 : 0);
+      case HotkeyAction.shuffle:
+        p.toggleShuffle();
+      case HotkeyAction.repeat:
+        p.cycleLoop();
+      case HotkeyAction.like:
+        final s = p.current;
+        if (s != null) likeWithToast(context, s);
+      case HotkeyAction.miniPlayer:
+        desktopWindow.toggleMini();
+      case HotkeyAction.nowPlaying:
+        if (p.current != null) openNowPlaying(context);
+      case HotkeyAction.search:
+        goToId('search');
+    }
+  }
+
   @override
   void dispose() {
+    _hotkeys?.stop();
     errors?.cancel();
     super.dispose();
   }
