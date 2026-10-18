@@ -33,13 +33,13 @@ ThemeData buildTheme() {
     useMaterial3: true,
     brightness: p.light ? Brightness.light : Brightness.dark,
     colorScheme: scheme,
-    scaffoldBackgroundColor: p.bg,
-    appBarTheme: AppBarTheme(backgroundColor: p.bg, surfaceTintColor: Colors.transparent, elevation: 0),
+    scaffoldBackgroundColor: p.picture ? Colors.transparent : p.bg,
+    appBarTheme: AppBarTheme(backgroundColor: p.picture ? Colors.transparent : p.bg, surfaceTintColor: Colors.transparent, elevation: 0),
     navigationBarTheme: NavigationBarThemeData(backgroundColor: p.nav, surfaceTintColor: Colors.transparent, indicatorColor: p.accent.withValues(alpha: 0.25)),
     navigationRailTheme: NavigationRailThemeData(backgroundColor: p.nav, indicatorColor: p.accent.withValues(alpha: 0.25)),
     cardTheme: CardThemeData(color: p.card, surfaceTintColor: Colors.transparent, elevation: 0),
-    bottomSheetTheme: BottomSheetThemeData(backgroundColor: p.nav, surfaceTintColor: Colors.transparent),
-    dialogTheme: DialogThemeData(backgroundColor: p.nav, surfaceTintColor: Colors.transparent),
+    bottomSheetTheme: BottomSheetThemeData(backgroundColor: p.nav.withValues(alpha: 1), surfaceTintColor: Colors.transparent),
+    dialogTheme: DialogThemeData(backgroundColor: p.nav.withValues(alpha: 1), surfaceTintColor: Colors.transparent),
     sliderTheme: const SliderThemeData(trackHeight: 3, thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6)),
   );
 }

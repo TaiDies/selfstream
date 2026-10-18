@@ -7,6 +7,7 @@ import '../state/presence.dart';
 import '../state/session.dart';
 import '../state/settings.dart';
 import '../state/updater.dart';
+import 'theme_editor.dart';
 import 'update_dialog.dart';
 import 'widgets.dart';
 
@@ -63,6 +64,28 @@ class SettingsScreen extends StatelessWidget {
                   ]),
                 ),
               ),
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => context.open(const ThemeEditorScreen()),
+              child: Container(
+                width: 84,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kCard,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: (settings.themeId == 'custom' || settings.themeId == 'picture') ? kAccent : Colors.transparent, width: 2),
+                ),
+                child: Column(children: [
+                  Container(
+                    height: 34,
+                    decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(8), border: Border.all(color: kMuted.withValues(alpha: 0.4))),
+                    child: Center(child: Icon(Icons.brush_outlined, size: 18, color: kAccent)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('Custom', style: TextStyle(fontSize: 12, color: kText, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            ),
           ]),
         ),
         const SizedBox(height: 8),

@@ -21,6 +21,33 @@ class Settings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The user's own theme: one colour (ARGB), light or dark, and an optional picture behind the app.
+  int get customAccent => _p.getInt('customAccent') ?? 0xFF1ED760;
+  set customAccent(int v) {
+    _p.setInt('customAccent', v);
+    notifyListeners();
+  }
+
+  bool get customLight => _p.getBool('customLight') ?? false;
+  set customLight(bool v) {
+    _p.setBool('customLight', v);
+    notifyListeners();
+  }
+
+  /// Path of the picture on this device ('' = none).
+  String get customPicture => _p.getString('customPicture') ?? '';
+  set customPicture(String v) {
+    _p.setString('customPicture', v);
+    notifyListeners();
+  }
+
+  /// How strongly the picture is darkened (0.3 to 0.9).
+  double get customDim => (_p.getDouble('customDim') ?? 0.6).clamp(0.3, 0.9);
+  set customDim(double v) {
+    _p.setDouble('customDim', v.clamp(0.3, 0.9));
+    notifyListeners();
+  }
+
   List<String> get recentSearches => List<String>.of(_p.getStringList('recentSearches') ?? const <String>[]);
 
   void addRecentSearch(String q) {

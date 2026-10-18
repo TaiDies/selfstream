@@ -18,6 +18,7 @@ import 'state/settings.dart';
 import 'ui/login_screen.dart';
 import 'ui/palette.dart';
 import 'ui/shell.dart';
+import 'ui/theme_editor.dart';
 import 'ui/widgets.dart';
 
 Future<void> main() async {
@@ -62,7 +63,10 @@ class _SelfstreamAppState extends State<SelfstreamApp> {
       value: session,
       child: Consumer<Session>(
         builder: (context, s, _) {
-          if (s.loaded) applyPalette(s.settings.themeId);
+          if (s.loaded) {
+            final st = s.settings;
+            applyPalette(st.themeId, accent: Color(st.customAccent), light: st.customLight, picture: st.customPicture.isNotEmpty && File(st.customPicture).existsSync());
+          }
           if (Platform.isWindows) {
             final pal = palette;
             WidgetsBinding.instance.addPostFrameCallback((_) => TitleBar.apply(pal.bg, pal.text, light: pal.light));
@@ -93,7 +97,7 @@ class _SelfstreamAppState extends State<SelfstreamApp> {
                   ChangeNotifierProvider<OfflineStore>.value(value: svc.offline),
                   ChangeNotifierProvider<PlayerController>.value(value: svc.player),
                 ],
-                child: child ?? const SizedBox.shrink(),
+                child: ThemeBackdrop(child: child ?? const SizedBox.shrink()),
               );
             },
             home: home,

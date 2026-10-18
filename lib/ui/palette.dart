@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// A colour theme. The app reads the current one through the k* getters below.
 class AppPalette {
-  const AppPalette(this.id, this.name, this.accent, this.bg, this.card, this.nav, this.muted, {this.light = false});
+  const AppPalette(this.id, this.name, this.accent, this.bg, this.card, this.nav, this.muted, {this.light = false, this.picture = false});
   final String id;
   final String name;
   final Color accent;
@@ -11,6 +11,9 @@ class AppPalette {
   final Color nav;
   final Color muted;
   final bool light;
+
+  /// A picture shows behind the app, so pages and panels are see-through.
+  final bool picture;
 
   Color get text => light ? const Color(0xFF15151C) : Colors.white;
   Color get onAccent => light ? Colors.white : Colors.black;
@@ -32,7 +35,27 @@ AppPalette get palette => _current;
 
 AppPalette paletteById(String id) => palettes.firstWhere((p) => p.id == id, orElse: () => palettes.first);
 
-void applyPalette(String id) => _current = paletteById(id);
+/// A theme made from one colour: the background, panels and text colours are tinted to match it.
+AppPalette customPalette(Color accent, {bool light = false, bool picture = false}) {
+  final h = HSLColor.fromColor(accent);
+  Color tone(double s, double l) => HSLColor.fromAHSL(1, h.hue, s, l).toColor();
+  final a = light ? h.withLightness(h.lightness.clamp(0.25, 0.40)).toColor() : h.withLightness(h.lightness.clamp(0.5, 0.72)).toColor();
+  if (light) {
+    return AppPalette(picture ? 'picture' : 'custom', 'Custom', a, tone(0.3, 0.96), picture ? Colors.white.withValues(alpha: 0.7) : Colors.white,
+        picture ? Colors.white.withValues(alpha: 0.8) : Colors.white, tone(0.12, 0.40), light: true, picture: picture);
+  }
+  return AppPalette(picture ? 'picture' : 'custom', 'Custom', a, tone(0.30, 0.06), picture ? tone(0.28, 0.11).withValues(alpha: 0.62) : tone(0.28, 0.11),
+      picture ? tone(0.30, 0.08).withValues(alpha: 0.78) : tone(0.30, 0.08), tone(0.15, 0.66), picture: picture);
+}
+
+/// Picks the current theme. 'custom' and 'picture' are the user's own colour theme (with a picture behind it for 'picture').
+void applyPalette(String id, {Color? accent, bool light = false, bool picture = false}) {
+  if (id == 'custom' || id == 'picture') {
+    _current = customPalette(accent ?? palettes.first.accent, light: light, picture: id == 'picture' && picture);
+  } else {
+    _current = paletteById(id);
+  }
+}
 
 Color get kAccent => _current.accent;
 Color get kBg => _current.bg;
