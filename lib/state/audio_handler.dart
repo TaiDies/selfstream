@@ -22,6 +22,9 @@ class SelfstreamAudio {
         androidNotificationChannelName: 'Selfstream playback',
         androidNotificationOngoing: true,
         androidNotificationIcon: 'drawable/ic_stat_selfstream',
+        // Android Auto drops cover bitmaps that are too big for the media session, so hand it a smaller one.
+        artDownscaleWidth: 320,
+        artDownscaleHeight: 320,
       ),
     );
   }
