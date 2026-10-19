@@ -4,7 +4,7 @@
 # a ready "reviewer" account, so app store reviewers can sign in and test the player. Nothing else is installed.
 #
 # Run on the Proxmox VE host shell (one line):
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/TaiDies/selfstream/main/reviewer-server/ct/reviewer-demo.sh)"
+#   bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/TaiDies/selfstream/main/reviewer-server/ct/reviewer-demo.sh?'$(date +%s))"
 #
 # Optional settings in front of the command, for example:
 #   CF_TUNNEL_TOKEN=eyJ... bash -c "..."     public https address through your own Cloudflare Tunnel (stable)
@@ -72,7 +72,7 @@ pct exec "$CTID" -- getent hosts github.com >/dev/null 2>&1 || die "the containe
 msg "Installing Navidrome and the demo library (a minute or two)"
 pct exec "$CTID" -- env LC_ALL=C LANG=C bash -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates >/dev/null"
 pct exec "$CTID" -- env LC_ALL=C LANG=C DEMO_RAW="$RAW" CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-}" TUNNEL="${TUNNEL:-}" \
-  bash -c "curl -fsSL '${RAW}/install-demo-server.sh' | bash"
+  bash -c "curl -fsSL '${RAW}/install-demo-server.sh?$(date +%s)' -o /tmp/install-demo-server.sh && bash /tmp/install-demo-server.sh"
 
 echo
 msg "Done. Container $CTID. These are the details for the Microsoft Store notes:"
