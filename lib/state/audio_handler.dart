@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart' show ProcessingState;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/models.dart';
 import 'auto_cover.dart';
@@ -29,6 +31,7 @@ class SelfstreamAudio {
         artDownscaleHeight: 320,
       ),
     );
+    await handler?.loadLast();
   }
 }
 
@@ -37,6 +40,51 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
   final List<StreamSubscription<Object?>> _subs = [];
   String _itemKey = '';
   String _queueKey = '';
+
+  bool _playWhenReady = false;
+  Timer? _readyTimer;
+
+  /// Show the last played song straight away (before the app has signed in and restored its queue), so Android Auto
+  /// sees Selfstream as the app to resume instead of handing the screen to another player.
+  Future<void> loadLast() async {
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString('last_queue');
+      if (raw == null) return;
+      final v = jsonDecode(raw);
+      if (v is! Map) return;
+      final songs = songsFrom(v['songs']);
+      if (songs.isEmpty) return;
+      final s = songs[((v['index'] as num?)?.toInt() ?? 0).clamp(0, songs.length - 1)];
+      mediaItem.add(MediaItem(
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        album: s.album,
+        artUri: s.coverArt.isNotEmpty ? AutoCovers.uriFor(s.coverArt) : null,
+        duration: s.duration > 0 ? Duration(seconds: s.duration) : null,
+      ));
+      playbackState.add(PlaybackState(
+        controls: [MediaControl.skipToPrevious, MediaControl.play, MediaControl.skipToNext],
+        processingState: AudioProcessingState.ready,
+        playing: false,
+      ));
+    } catch (_) {}
+  }
+
+  /// Something (Android Auto, a headset) asked to play before the queue was loaded: play as soon as it is.
+  void _playAfterRestore() {
+    _playWhenReady = true;
+    _readyTimer?.cancel();
+    _readyTimer = Timer(const Duration(seconds: 90), () => _playWhenReady = false);
+  }
+
+  /// The player has loaded the saved queue.
+  void restored(PlayerController c) {
+    if (!_playWhenReady || c.queue.isEmpty) return;
+    _playWhenReady = false;
+    _readyTimer?.cancel();
+    unawaited(c.player.play());
+  }
 
   void attach(PlayerController c) {
     detach();
@@ -101,6 +149,7 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
   void _pushState() {
     final c = _c;
     if (c == null) return;
+    if (c.queue.isEmpty && mediaItem.value != null) return; // keep showing the last song until the queue is loaded
     try {
       final p = c.player;
       final song = c.current;
@@ -118,8 +167,12 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
         ],
         systemActions: const {MediaAction.seek, MediaAction.seekForward, MediaAction.seekBackward},
         androidCompactActionIndices: const [0, 1, 2],
-        processingState: const {
-          ProcessingState.idle: AudioProcessingState.idle,
+        // "idle" makes Android drop the media session (and Android Auto hands over to another app), so while there
+        // is a queue we report "loading" instead, e.g. in the moment between two songs.
+        processingState: (c.queue.isEmpty && p.processingState == ProcessingState.idle)
+            ? AudioProcessingState.idle
+            : const {
+          ProcessingState.idle: AudioProcessingState.loading,
           ProcessingState.loading: AudioProcessingState.loading,
           ProcessingState.buffering: AudioProcessingState.buffering,
           ProcessingState.ready: AudioProcessingState.ready,
@@ -137,8 +190,18 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> play() async {
     final c = _c;
-    if (c != null) unawaited(c.player.play());
+    if (c == null || c.queue.isEmpty) {
+      _playAfterRestore();
+      return;
+    }
+    unawaited(c.player.play());
   }
+
+  @override
+  Future<void> prepare() async {}
+
+  @override
+  Future<void> prepareFromMediaId(String mediaId, [Map<String, dynamic>? extras]) async {}
 
   @override
   Future<void> pause() async => _c?.player.pause();
@@ -159,12 +222,21 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
   Future<void> skipToQueueItem(int index) async => _c?.jumpTo(index);
 
   @override
-  Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) async => queue.value;
+  Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) async {
+    if (parentMediaId == AudioService.recentRootId) {
+      final m = mediaItem.value;
+      return m == null ? const [] : [m];
+    }
+    return queue.value;
+  }
 
   @override
   Future<void> playFromMediaId(String mediaId, [Map<String, dynamic>? extras]) async {
     final c = _c;
-    if (c == null) return;
+    if (c == null || c.queue.isEmpty) {
+      _playAfterRestore();
+      return;
+    }
     final i = c.queue.indexWhere((s) => s.id == mediaId);
     if (i >= 0) {
       await c.jumpTo(i);

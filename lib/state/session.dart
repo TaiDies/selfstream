@@ -48,6 +48,7 @@ class Services {
     } catch (_) {
       caps.set(Capabilities.generic); // not reachable and nothing saved yet
     }
+    unawaited(player.restore()); // picks up the last queue at once (Android Auto may be waiting for it)
     if (PresenceService.supported && caps.has('presence')) presence = PresenceService(api, player, settings)..start();
     await library.loadSaved(); // the last saved lists show at once, before any network call
     try {
@@ -61,7 +62,6 @@ class Services {
     } catch (_) {}
     await library.refresh();
     library.startPolling();
-    await player.restore();
   }
 
   void dispose() {

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/api.dart';
 import '../core/models.dart';
@@ -408,25 +410,42 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
-  Future<void> _save() async {
-    if (_disposed) return;
-    try {
-      if (!has('state')) return;
-      await api.putState('queue', {
+  static const _localKey = 'last_queue';
+
+  Map<String, dynamic> _snapshot() => {
         'songs': queue.take(300).map((s) => s.toJson()).toList(),
         'index': queue.length > 300 ? min(index, 299) : index,
         'positionMs': player.position.inMilliseconds,
         'shuffle': shuffle,
         'loop': loop.index,
-      });
+      };
+
+  Future<void> _save() async {
+    if (_disposed || queue.isEmpty) return;
+    final snap = _snapshot();
+    try {
+      // kept on this device too, so Android Auto can carry on where you stopped even without the server's help
+      (await SharedPreferences.getInstance()).setString(_localKey, jsonEncode(snap));
+    } catch (_) {}
+    try {
+      if (has('state')) await api.putState('queue', snap);
     } catch (_) {}
   }
 
   /// Load the queue saved by the last device, paused, so you can continue.
   Future<void> restore() async {
-    if (queue.isNotEmpty || !has('state')) return;
+    if (queue.isNotEmpty) return;
     try {
-      final v = await api.getState('queue');
+      Object? v;
+      if (has('state')) {
+        try {
+          v = await api.getState('queue');
+        } catch (_) {}
+      }
+      if (v is! Map) {
+        final raw = (await SharedPreferences.getInstance()).getString(_localKey);
+        v = raw == null ? null : jsonDecode(raw);
+      }
       if (v is! Map) return;
       final songs = songsFrom(v['songs']);
       if (songs.isEmpty || queue.isNotEmpty) return;
@@ -442,6 +461,7 @@ class PlayerController extends ChangeNotifier {
       await player.setShuffleModeEnabled(v['shuffle'] == true);
       _beginTrack(null); // do not count the restored track as a listen until it plays
       notifyListeners();
+      if (!isDesktop) SelfstreamAudio.handler?.restored(this);
     } catch (_) {
       // nothing to restore, or the saved song is gone
     }
