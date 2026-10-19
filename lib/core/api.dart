@@ -168,7 +168,11 @@ class Api {
   Uri streamUri(String id, {int maxBitRate = 0}) =>
       _uri('/rest/stream', {'id': id, if (maxBitRate > 0) 'maxBitRate': maxBitRate});
 
-  Uri coverUri(String id, {int size = 300}) => _uri('/rest/getCoverArt', {'id': id, 'size': size});
+  // The same cover must always have the same address: the login hash in the URL is new on every call, and a new
+  // address makes Flutter fetch the picture again (covers flickering whenever a screen redrew).
+  final Map<String, Uri> _coverUris = {};
+
+  Uri coverUri(String id, {int size = 300}) => _coverUris.putIfAbsent('$id|$size', () => _uri('/rest/getCoverArt', {'id': id, 'size': size}));
 
   /// Cover URL without the changing salt/token, to key image caches on.
   String coverKey(String id, int size) => '$server|$id|$size';

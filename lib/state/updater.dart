@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../core/store_build.dart';
+
 /// Where new Windows builds are published (a GitHub release called "windows-latest").
 const String kUpdateRepo = 'TaiDies/selfstream';
 
@@ -22,7 +24,7 @@ class Updater {
   /// The Microsoft Store build lives in WindowsApps and is updated by the Store, so it never checks GitHub.
   static bool get _fromStore => Platform.isWindows && Platform.resolvedExecutable.contains(r'\WindowsApps\');
 
-  static bool get supported => Platform.isWindows && kBuildNumber > 0 && !_fromStore;
+  static bool get supported => !kStoreBuild && Platform.isWindows && kBuildNumber > 0 && !_fromStore;
 
   /// The newer build, or null if this one is current (or GitHub cannot be reached).
   static Future<UpdateInfo?> check({http.Client? client}) async {

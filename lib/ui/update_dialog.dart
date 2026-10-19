@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/store_build.dart';
 import '../state/android_updater.dart';
 import '../state/settings.dart';
 import '../state/updater.dart';
 import 'widgets.dart';
 
 /// Can this build update itself (Windows installer, Android test build from your server, or Google Play)?
-bool get appUpdatesSupported => Updater.supported || AndroidUpdater.supported;
+/// The Microsoft Store build never has any update code: the Store updates it.
+bool get appUpdatesSupported => !kStoreBuild && (Updater.supported || AndroidUpdater.supported);
 
 /// The right check for this platform. [manual] also reports "up to date" and ignores a skipped version.
-Future<void> checkForAppUpdate(BuildContext context, {bool manual = false}) {
+Future<void> checkForAppUpdate(BuildContext context, {bool manual = false}) =>
+    kStoreBuild ? Future<void>.value() : _checkForAppUpdate(context, manual: manual); // constant: the update code is left out of the Store build
+
+Future<void> _checkForAppUpdate(BuildContext context, {bool manual = false}) {
   if (AndroidUpdater.supported) return checkForAndroidUpdate(context, manual: manual);
   return checkForUpdate(context, manual: manual);
 }

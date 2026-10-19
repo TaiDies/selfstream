@@ -119,6 +119,7 @@ class Cover extends StatelessWidget {
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
+                gaplessPlayback: true,
                 errorBuilder: (_, __, ___) => placeholder,
               )
             : CachedNetworkImage(
