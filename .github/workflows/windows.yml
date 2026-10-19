@@ -56,6 +56,9 @@ jobs:
             echo "Partner Center values not set (repo variables MSIX_IDENTITY_NAME, MSIX_PUBLISHER, MSIX_PUBLISHER_NAME); skipping the MSIX."
             exit 0
           fi
+          # The Store package is its own build: a plain Subsonic / Navidrome player, without selfstream's server extensions.
+          set -o pipefail
+          flutter build windows --release --dart-define=BUILD_NUMBER=${{ github.run_number }} --dart-define=STORE_BUILD=true 2>&1 | tee win-store-build.log
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
           dart run msix:create --store --build-windows false \
             --display-name Selfstream --identity-name "$MSIX_IDENTITY_NAME" \

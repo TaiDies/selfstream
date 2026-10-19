@@ -8,6 +8,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
 import 'caps.dart';
+import 'store_build.dart';
 import 'models.dart';
 
 class ApiException implements Exception {
@@ -272,6 +273,7 @@ class Api {
 
   Future<Map<String, dynamic>> _v1Call(String method, String path,
       {Map<String, Object?> query = const {}, Object? body}) async {
+    if (kStoreBuild) throw ApiException('Not available in this edition', status: 404); // plain Subsonic player only
     final key = cache != null && method == 'GET' && !path.startsWith('suggest') && path != 'ping'
         ? _cacheKey('v1/$path', {for (final e in query.entries) if (e.key != 'refresh') e.key: e.value})
         : null;
