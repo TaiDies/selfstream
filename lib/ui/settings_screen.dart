@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../core/store_build.dart';
 import '../platform/platform.dart';
 import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
@@ -138,7 +137,7 @@ class SettingsScreen extends StatelessWidget {
           onChanged: (v) => settings.trackListening = v,
         ),
         const Divider(),
-        if (PresenceService.supported && !kStoreBuild) ...[
+        if (PresenceService.supported) ...[
           const SectionHeader('Discord'),
           SwitchListTile(
             secondary: const Icon(Icons.sports_esports_outlined),
