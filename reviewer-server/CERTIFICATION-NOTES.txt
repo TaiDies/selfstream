@@ -1,0 +1,28 @@
+NOTES FOR CERTIFICATION (paste into Submission options > Notes for certification)
+Replace the three placeholders in <> before submitting.
+
+Selfstream is a music player (client) for a Navidrome / Subsonic music server that the user runs themselves.
+It does not contain any music and it does not provide a server or an account. On first start it shows a sign-in
+screen asking for the address of the user's own server, a user name and a password. That is why the app looks
+empty until it is connected to a server that already holds music: every user adds their own music files to their
+own Navidrome server (copying their own music into the server's music folder), and the app plays it.
+
+To make testing possible we run a plain, unmodified Navidrome server with a small demo library. The demo tracks
+were synthesized from scratch for this purpose (no recordings, no samples, CC0), so nothing is copyrighted.
+
+HOW TO TEST
+1. Start Selfstream. On the sign-in screen enter:
+     Server:    <SERVER URL, e.g. https://demo.example.com>
+     User name: <USERNAME>
+     Password:  <PASSWORD>
+2. After signing in you will see Home, Search and Library. The library has 3 albums by 3 demo artists
+   (9 short tracks). Tap any album or track to play it.
+3. Things worth trying: play / pause / next / previous / seek, the volume slider, shuffle and repeat, the queue,
+   Search (type "demo" or "sample"), liking a song (Library > Liked), creating a playlist from the song menu,
+   the synced-lyrics view in Now Playing (demo tracks have no lyrics, so it says none are available),
+   Settings > Theme, the mini player (button in the side bar) and keep-on-top.
+4. The app only sends requests to the server address entered on the sign-in screen. The password is sent as a
+   salted hash (Subsonic token authentication), never as plain text.
+
+The sign-in is not a Microsoft/Store account and the app has no in-app purchases, ads or accounts of its own.
+The demo server is provided only for certification; please do not change or delete the demo account.

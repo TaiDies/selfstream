@@ -3,7 +3,7 @@ name: windows exe
 on:
   push:
     branches: [main]
-    paths-ignore: ["docs/**", "**.md", "website/**"]
+    paths-ignore: ["docs/**", "**.md", "website/**", "reviewer-server/**"]
   workflow_dispatch:
 
 permissions:
