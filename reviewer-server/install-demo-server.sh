@@ -22,17 +22,24 @@ apt-get update -qq && apt-get install -y -qq curl ca-certificates tar python3 >/
 
 # the demo library and the account script: next to this file if present, otherwise downloaded
 if [ -d "$HERE/demo-music" ]; then MUSIC_SRC="$HERE/demo-music"; else
-  curl -fsSL "$RAW/demo-music.tar.gz" | tar -xz -C "$WORK"; MUSIC_SRC="$WORK/demo-music"; fi
+  curl -fsSL "$RAW/demo-music.tar.gz" -o "$WORK/demo-music.tar.gz" && tar -xzf "$WORK/demo-music.tar.gz" -C "$WORK"; MUSIC_SRC="$WORK/demo-music"; fi
 if [ -f "$HERE/create-users.sh" ]; then USERS="$HERE/create-users.sh"; else
   curl -fsSL "$RAW/create-users.sh" -o "$WORK/create-users.sh"; USERS="$WORK/create-users.sh"; fi
 [ -d "$MUSIC_SRC" ] || { echo "Could not get the demo music."; exit 1; }
 
 case "$(uname -m)" in x86_64) arch=amd64;; aarch64) arch=arm64;; armv7l) arch=armv7;; *) echo "Unsupported CPU"; exit 1;; esac
-ver=$(curl -fsSL https://api.github.com/repos/navidrome/navidrome/releases/latest | grep -m1 '"tag_name"' | sed -E 's/.*"v?([0-9][^"]*)".*/\1/')
-[ -n "$ver" ] || { echo "Could not find the latest Navidrome version."; exit 1; }
+# the newest Navidrome release: from the redirect of the "latest" page, else the API, else a known good version
+ver=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/navidrome/navidrome/releases/latest 2>/dev/null | sed -E 's#.*/tag/v?##' || true)
+case "$ver" in [0-9]*) ;; *) ver="";; esac
+if [ -z "$ver" ]; then
+  json=$(curl -fsSL https://api.github.com/repos/navidrome/navidrome/releases/latest 2>/dev/null || true)
+  ver=$(printf '%s' "$json" | sed -nE 's/.*"tag_name": *"v?([0-9][^"]*)".*/\1/p' | head -n1)
+fi
+ver=${ver:-0.55.2}
 id navidrome-demo >/dev/null 2>&1 || useradd --system --home /var/lib/navidrome-demo --shell /usr/sbin/nologin navidrome-demo
 mkdir -p /opt/navidrome-demo /var/lib/navidrome-demo /srv/demo-music
-curl -fsSL "https://github.com/navidrome/navidrome/releases/download/v${ver}/navidrome_${ver}_linux_${arch}.tar.gz" | tar -xz -C /opt/navidrome-demo navidrome
+curl -fsSL "https://github.com/navidrome/navidrome/releases/download/v${ver}/navidrome_${ver}_linux_${arch}.tar.gz" -o "$WORK/navidrome.tar.gz"
+tar -xzf "$WORK/navidrome.tar.gz" -C /opt/navidrome-demo navidrome
 cp -r "$MUSIC_SRC/." /srv/demo-music/
 chown -R navidrome-demo:navidrome-demo /var/lib/navidrome-demo /srv/demo-music
 

@@ -70,8 +70,8 @@ for _ in $(seq 1 30); do pct exec "$CTID" -- getent hosts github.com >/dev/null 
 pct exec "$CTID" -- getent hosts github.com >/dev/null 2>&1 || die "the container has no network/DNS. Check BRIDGE/IP, then 'pct destroy $CTID' and retry"
 
 msg "Installing Navidrome and the demo library (a minute or two)"
-pct exec "$CTID" -- bash -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates >/dev/null"
-pct exec "$CTID" -- env DEMO_RAW="$RAW" CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-}" TUNNEL="${TUNNEL:-}" \
+pct exec "$CTID" -- env LC_ALL=C LANG=C bash -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates >/dev/null"
+pct exec "$CTID" -- env LC_ALL=C LANG=C DEMO_RAW="$RAW" CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-}" TUNNEL="${TUNNEL:-}" \
   bash -c "curl -fsSL '${RAW}/install-demo-server.sh' | bash"
 
 echo
