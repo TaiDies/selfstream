@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart' show ProcessingState;
 
 import '../core/models.dart';
+import 'auto_cover.dart';
 import 'player.dart';
 
 /// Android: the system media notification, lock screen, headset buttons and Android Auto.
@@ -62,16 +64,20 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
     playbackState.add(PlaybackState());
   }
 
+  /// Android Auto can only read content:// covers, so those come from the app's CoverProvider.
+  Uri _art(PlayerController c, Song s) =>
+      Platform.isAndroid && s.coverArt.isNotEmpty ? AutoCovers.uriFor(s.coverArt) : c.artFor(s);
+
   MediaItem _item(PlayerController c, Song s) => MediaItem(
         id: s.id,
         title: s.title,
         artist: s.artist,
         album: s.album,
-        artUri: c.artFor(s),
+        artUri: _art(c, s),
         duration: s.duration > 0 ? Duration(seconds: s.duration) : null,
       );
 
-  void _pushAll() {
+  Future<void> _pushAll() async {
     final c = _c;
     if (c == null) return;
     try {
@@ -84,6 +90,8 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
       final iKey = s == null ? '' : '${s.id}|${c.artFor(s)}';
       if (iKey != _itemKey) {
         _itemKey = iKey;
+        if (s != null) await AutoCovers.ensure(s.coverArt, c.artFor(s));
+        if (_c != c || c.current?.id != s?.id) return; // moved on while the cover was loading
         mediaItem.add(s == null ? null : _item(c, s));
       }
       _pushState();
