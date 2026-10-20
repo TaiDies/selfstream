@@ -141,7 +141,7 @@ class PlayerController extends ChangeNotifier {
     try {
       await player.setShuffleModeEnabled(shuffle);
       await player.setAudioSource(_source!, initialIndex: first, initialPosition: Duration.zero);
-      if (shuffle) await player.shuffle();
+      if (shuffle) await _reshuffle();
       unawaited(player.play());
     } catch (e) {
       _errors.add('Could not start playback: ${_clean(e)}');
@@ -150,6 +150,14 @@ class PlayerController extends ChangeNotifier {
         unawaited(player.play());
       }
     }
+  }
+
+  /// Deal a fresh shuffle order. The Windows audio back end shuffles by itself and does not take a custom order
+  /// (it answers "not implemented"); that must never stop the song from playing.
+  Future<void> _reshuffle() async {
+    try {
+      await player.shuffle();
+    } catch (_) {}
   }
 
   Future<void> playSong(Song s) => playSongs([s]);
@@ -163,7 +171,7 @@ class PlayerController extends ChangeNotifier {
       await player.setLoopMode(wasLoop);
       if (wasShuffle) {
         await player.setShuffleModeEnabled(true);
-        await player.shuffle();
+        await _reshuffle();
       }
     } catch (_) {}
   }
@@ -192,7 +200,7 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> toggleShuffle() async {
     await player.setShuffleModeEnabled(!player.shuffleModeEnabled);
-    if (player.shuffleModeEnabled) await player.shuffle();
+    if (player.shuffleModeEnabled) await _reshuffle();
     _scheduleSave();
   }
 
