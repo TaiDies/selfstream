@@ -109,6 +109,20 @@ class Settings extends ChangeNotifier {
     _p.setDouble('volume', v.clamp(0.0, 1.0));
   }
 
+  /// Windows: a page with the current song for OBS (a Browser source), served only on this computer.
+  static const int defaultObsAccent = 0xFF1DB954;
+  bool get obsOverlay => _p.getBool('obsOverlay') ?? false;
+  set obsOverlay(bool v) {
+    _p.setBool('obsOverlay', v);
+    notifyListeners();
+  }
+
+  int get obsAccent => _p.getInt('obsAccent') ?? defaultObsAccent;
+  set obsAccent(int v) {
+    _p.setInt('obsAccent', v);
+    notifyListeners();
+  }
+
   /// Windows: show what is playing on Discord. The id is optional, the server can supply one.
   bool get discordPresence => _p.getBool('discordPresence') ?? true;
   set discordPresence(bool v) {

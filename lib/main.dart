@@ -12,6 +12,7 @@ import 'state/global_hotkeys.dart';
 import 'state/audio_handler.dart';
 import 'state/caps_holder.dart';
 import 'state/library.dart';
+import 'state/obs_overlay.dart';
 import 'state/offline.dart';
 import 'state/player.dart';
 import 'state/session.dart';
@@ -94,6 +95,7 @@ class _SelfstreamAppState extends State<SelfstreamApp> {
                   ChangeNotifierProvider<CapsHolder>.value(value: svc.caps),
                   ChangeNotifierProvider<OfflineStore>.value(value: svc.offline),
                   ChangeNotifierProvider<PlayerController>.value(value: svc.player),
+                  if (svc.overlay != null) ChangeNotifierProvider<ObsOverlay>.value(value: svc.overlay!),
                 ],
                 child: ThemeBackdrop(child: child ?? const SizedBox.shrink()),
               );

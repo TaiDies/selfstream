@@ -11,6 +11,7 @@ import 'file_cache.dart';
 import 'library.dart';
 import 'presence.dart';
 import 'offline.dart';
+import 'obs_overlay.dart';
 import 'player.dart';
 import 'settings.dart';
 
@@ -26,8 +27,10 @@ class Services {
     library.has = caps.has;
     player = PlayerController(api, library, offline, settings);
     player.has = caps.has;
+    if (ObsOverlay.supported) overlay = ObsOverlay.forPlayer(api, player, settings);
   }
 
+  ObsOverlay? overlay;
   final Api api;
   final Settings settings;
 
@@ -45,6 +48,7 @@ class Services {
   bool _none(List<ConnectivityResult> r) => r.isEmpty || r.every((x) => x == ConnectivityResult.none);
 
   Future<void> start() async {
+    overlay?.start();
     await offline.load();
     if (offlineOnly) {
       api.setForcedOffline(true);
@@ -80,6 +84,7 @@ class Services {
 
   void dispose() {
     presence?.dispose();
+    overlay?.dispose();
     caps.dispose();
     _net?.cancel();
     _back?.cancel();

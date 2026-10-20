@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../platform/platform.dart';
 import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
+import '../state/obs_overlay.dart';
 import '../state/offline.dart';
 import '../state/presence.dart';
 import '../state/session.dart';
@@ -150,6 +151,18 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(),
         ],
+        if (ObsOverlay.supported) ...[
+          const SectionHeader('Stream overlay (OBS)'),
+          SwitchListTile(
+            secondary: const Icon(Icons.live_tv_outlined),
+            title: const Text('Show my song on stream'),
+            subtitle: const Text('A link for OBS that shows the song you are playing, with cover, time and progress. It only works on this computer.'),
+            value: settings.obsOverlay,
+            onChanged: (v) => settings.obsOverlay = v,
+          ),
+          if (settings.obsOverlay) const _ObsOverlayPanel(),
+          const Divider(),
+        ],
         if (isDesktop) ...[
           const SectionHeader('Keyboard shortcuts'),
           _ShortcutsList(settings: settings),
@@ -238,6 +251,74 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
+
+/// The OBS link, its colour and how to add it.
+class _ObsOverlayPanel extends StatelessWidget {
+  const _ObsOverlayPanel();
+
+  static const _colors = [0xFF1DB954, 0xFFE8825A, 0xFFE0568C, 0xFF4DA3FF, 0xFFA66CFF, 0xFFFFFFFF];
+
+  @override
+  Widget build(BuildContext context) {
+    final obs = context.watch<ObsOverlay>();
+    final settings = context.watch<Settings>();
+    final link = obs.link;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(72, 0, 16, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (obs.error != null)
+          Text(obs.error!, style: const TextStyle(color: Colors.redAccent))
+        else if (link == null)
+          Text('Starting...', style: TextStyle(color: kMuted))
+        else ...[
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+            decoration: BoxDecoration(border: Border.all(color: kMuted.withValues(alpha: 0.4)), borderRadius: BorderRadius.circular(8)),
+            child: Row(children: [
+              Expanded(child: SelectableText(link, style: const TextStyle(fontFamily: 'Consolas'))),
+              IconButton(
+                tooltip: 'Copy link',
+                icon: const Icon(Icons.copy, size: 18),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: link));
+                  if (context.mounted) context.toast('Link copied');
+                },
+              ),
+              IconButton(
+                tooltip: 'Preview in your browser',
+                icon: const Icon(Icons.open_in_new, size: 18),
+                onPressed: () => Process.run('rundll32', ['url.dll,FileProtocolHandler', link]),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          Text('In OBS: Sources, + , Browser. Paste the link, set Width 540 and Height 190. It shows while Selfstream is open.',
+              style: TextStyle(color: kMuted, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text('Extras in the link: &scale=1.5 makes it bigger, &hide=paused hides it when nothing plays.',
+              style: TextStyle(color: kMuted, fontSize: 12)),
+        ],
+        const SizedBox(height: 12),
+        Wrap(spacing: 10, children: [
+          for (final c in _colors)
+            InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => settings.obsAccent = c,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Color(c),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: settings.obsAccent == c ? Colors.white : Colors.transparent, width: 2.5),
+                ),
+              ),
+            ),
+        ]),
+      ]),
+    );
+  }
+}
 
 /// The list of shortcuts; tap one, then press the new keys.
 class _ShortcutsList extends StatelessWidget {
