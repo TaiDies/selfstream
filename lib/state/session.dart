@@ -16,7 +16,7 @@ import 'settings.dart';
 
 /// Everything that exists while someone is signed in.
 class Services {
-  Services(this.api, this.settings)
+  Services(this.api, this.settings, {this.offlineOnly = false})
       : offline = OfflineStore(api, settings),
         library = Library(api) {
     _back = api.offlineChanges.listen((off) {
@@ -30,6 +30,9 @@ class Services {
 
   final Api api;
   final Settings settings;
+
+  /// Signed out, but opened from the saved copies on this device: no network calls at all.
+  final bool offlineOnly;
   final OfflineStore offline;
   final Library library;
   late final PlayerController player;
@@ -43,6 +46,17 @@ class Services {
 
   Future<void> start() async {
     await offline.load();
+    if (offlineOnly) {
+      api.setForcedOffline(true);
+      try {
+        caps.set(await api.capabilities()); // the saved copy of what the server offered
+      } catch (_) {
+        caps.set(Capabilities.generic);
+      }
+      await library.loadSaved();
+      unawaited(player.restore());
+      return;
+    }
     try {
       caps.set(await api.capabilities());
     } catch (_) {
@@ -87,6 +101,12 @@ class Session extends ChangeNotifier {
 
   bool get signedIn => services != null;
 
+  /// Signed out but using the libraries saved on this device (see [enterOfflineMode]).
+  bool offlineMode = false;
+
+  /// Offline mode is there for anyone who has signed in on this device before.
+  bool get canUseOffline => server.isNotEmpty && user.isNotEmpty;
+
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
     settings = Settings(_prefs!);
@@ -100,6 +120,8 @@ class Session extends ChangeNotifier {
       } catch (_) {
         // stay on the login screen with the saved address filled in
       }
+    } else if (canUseOffline && _prefs!.getBool('offlineMode') == true) {
+      await enterOfflineMode(); // you left it this way: carry on in offline mode
     }
     loaded = true;
     notifyListeners();
@@ -121,7 +143,15 @@ class Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _enter(String s, String u, String p, {required bool verify}) async {
+  /// Open the app without signing in: downloaded songs, saved playlists and liked songs, no server needed.
+  /// Only for someone who has signed in here before (their saved copies are what it shows).
+  Future<void> enterOfflineMode() async {
+    if (!canUseOffline) return;
+    await _prefs?.setBool('offlineMode', true);
+    await _enter(server, user, '', verify: false, offlineOnly: true);
+  }
+
+  Future<void> _enter(String s, String u, String p, {required bool verify, bool offlineOnly = false}) async {
     final api = Api(server: s, user: u, password: p, cache: FileResponseCache('$s|$u'));
     if (verify) {
       try {
@@ -132,8 +162,10 @@ class Session extends ChangeNotifier {
       }
     }
     services?.dispose();
-    final svc = Services(api, settings);
+    final svc = Services(api, settings, offlineOnly: offlineOnly);
     services = svc;
+    offlineMode = offlineOnly;
+    if (!offlineOnly) await _prefs?.remove('offlineMode');
     notifyListeners();
     // the first refresh must not block the UI (and must not log you out when the server is briefly away)
     svc.start();
@@ -148,8 +180,10 @@ class Session extends ChangeNotifier {
   Future<void> signOut() async {
     services?.dispose();
     services = null;
+    offlineMode = false;
     _password = '';
     await _prefs?.remove('password');
+    await _prefs?.remove('offlineMode');
     notifyListeners();
   }
 }

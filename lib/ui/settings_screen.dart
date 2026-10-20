@@ -36,7 +36,7 @@ class SettingsScreen extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.dns_outlined),
           title: Text(session.server),
-          subtitle: Text('Signed in as ${session.user}'),
+          subtitle: Text(session.offlineMode ? 'Offline mode (${session.user})' : 'Signed in as ${session.user}'),
         ),
         const Divider(),
         const SectionHeader('Appearance'),
@@ -207,16 +207,28 @@ class SettingsScreen extends StatelessWidget {
         const Divider(),
         ],
         const SectionHeader('Account'),
-        ListTile(
-          leading: const Icon(Icons.logout),
-          title: const Text('Sign out'),
-          onTap: () async {
-            if (!await confirm(context, 'Sign out?', 'Your playlists and history stay on the server.', ok: 'Sign out')) return;
-            if (!context.mounted) return;
-            Navigator.of(context).popUntil((r) => r.isFirst);
-            await session.signOut();
-          },
-        ),
+        if (session.offlineMode)
+          ListTile(
+            leading: const Icon(Icons.login),
+            title: const Text('Sign in'),
+            subtitle: const Text('You are in offline mode: only what is saved on this device is available'),
+            onTap: () async {
+              Navigator.of(context).popUntil((r) => r.isFirst);
+              await session.signOut();
+            },
+          )
+        else
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Sign out'),
+            subtitle: const Text('You can still open your downloads and saved libraries in offline mode'),
+            onTap: () async {
+              if (!await confirm(context, 'Sign out?', 'Your playlists and history stay on the server. You can still use offline mode with what is saved on this device.', ok: 'Sign out')) return;
+              if (!context.mounted) return;
+              Navigator.of(context).popUntil((r) => r.isFirst);
+              await session.signOut();
+            },
+          ),
         Padding(
           padding: EdgeInsets.all(20),
           child: Text('Selfstream 0.3\nYour music, playlists and listening history live on your own server.', style: TextStyle(color: kMuted, fontSize: 12)),

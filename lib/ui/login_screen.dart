@@ -95,6 +95,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                   child: busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Sign in', style: TextStyle(fontSize: 16)),
                 ),
+                if (context.read<Session>().canUseOffline) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : () => context.read<Session>().enterOfflineMode(),
+                    icon: const Icon(Icons.download_done),
+                    label: const Text('Use offline mode'),
+                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('Your downloaded songs and saved libraries, without signing in.',
+                      textAlign: TextAlign.center, style: TextStyle(color: kMuted, fontSize: 12)),
+                ],
                 const SizedBox(height: 18),
                 Text(
                   'Use your server address and your Navidrome login.',
