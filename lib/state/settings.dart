@@ -110,7 +110,8 @@ class Settings extends ChangeNotifier {
   }
 
   /// Windows: a page with the current song for OBS (a Browser source), served only on this computer.
-  static const int defaultObsAccent = 0xFF1DB954;
+  /// 0 = the colours follow the cover; anything else is a fixed colour.
+  static const int defaultObsAccent = 0;
   bool get obsOverlay => _p.getBool('obsOverlay') ?? false;
   set obsOverlay(bool v) {
     _p.setBool('obsOverlay', v);

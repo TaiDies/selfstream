@@ -299,7 +299,25 @@ class _ObsOverlayPanel extends StatelessWidget {
               style: TextStyle(color: kMuted, fontSize: 12)),
         ],
         const SizedBox(height: 12),
-        Wrap(spacing: 10, children: [
+        Text('Colours', style: TextStyle(color: kMuted, fontSize: 12)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          Tooltip(
+            message: 'Follow the cover',
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => settings.obsAccent = 0,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  gradient: const SweepGradient(colors: [Color(0xFFE0568C), Color(0xFFE8825A), Color(0xFF1DB954), Color(0xFF4DA3FF), Color(0xFFA66CFF), Color(0xFFE0568C)]),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: settings.obsAccent == 0 ? Colors.white : Colors.transparent, width: 2.5),
+                ),
+              ),
+            ),
+          ),
           for (final c in _colors)
             InkWell(
               customBorder: const CircleBorder(),
