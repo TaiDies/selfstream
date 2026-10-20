@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() => HttpOverrides.global = null); // the test binding answers every request with 400; this one needs the real thing
 
   test('the overlay is served on this computer only and holds no login', () async {
     SharedPreferences.setMockInitialValues({'obsOverlay': true});
