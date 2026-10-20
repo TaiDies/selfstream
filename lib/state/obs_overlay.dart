@@ -218,8 +218,14 @@ html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden
   opacity:0;transition:opacity .5s ease}
 #wrap.on{opacity:1}
 .row{display:flex;gap:16px;align-items:center}
-#cover{width:104px;height:104px;border-radius:50%;flex:none;background:#2a2a2a center/cover no-repeat;
-  box-shadow:0 0 0 3px var(--accent),0 6px 18px rgba(0,0,0,.45);transition:box-shadow .6s}
+#disc{position:relative;width:104px;height:104px;flex:none;border-radius:50%;box-shadow:0 0 0 3px var(--accent),0 6px 18px rgba(0,0,0,.45);transition:box-shadow .6s}
+#cover{position:absolute;inset:0;border-radius:50%;background:#2a2a2a center/cover no-repeat;animation:spin 12s linear infinite;animation-play-state:paused}
+#cover.spin{animation-play-state:running}
+@keyframes spin{to{transform:rotate(360deg)}}
+#disc:after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  background:conic-gradient(from 30deg,rgba(255,255,255,.16),transparent 18%,transparent 50%,rgba(255,255,255,.12) 66%,transparent 82%)}
+#hub{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;z-index:1;
+  background-color:var(--card);box-shadow:0 0 0 3px rgba(0,0,0,.35),inset 0 0 0 3px var(--accent);transition:background-color .6s,box-shadow .6s}
 .cards{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .card{background-color:var(--card);border-radius:12px;padding:8px 14px;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:background-color .6s}
 #title{font-size:21px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -231,7 +237,7 @@ html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden
 #bar{height:8px;border-radius:4px;background-color:var(--track);margin:10px 4px 0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.35);transition:background-color .6s}
 #fill{height:100%;width:0;background-color:var(--accent);border-radius:4px;transition:background-color .6s}
 </style></head><body>
-<div id="wrap"><div class="row"><div id="cover"></div><div class="cards">
+<div id="wrap"><div class="row"><div id="disc"><div id="cover"></div><div id="hub"></div></div><div class="cards">
  <div class="card"><div id="title"></div><div id="artist"></div></div>
  <div class="card time"><span id="pos">0:00</span><div id="wave"></div><span id="dur">0:00</span></div>
 </div></div><div id="bar"><div id="fill"></div></div></div>
@@ -280,6 +286,7 @@ function frame(){
     wrap.classList.add('on');
     if(st.id!==shownId){shownId=st.id;$('title').textContent=st.title;$('artist').textContent=st.artist;
       $('cover').style.backgroundImage=st.cover?`url("${st.cover}")`:'none';fromCover(st.cover);shape(st.id)}
+    $('cover').classList.toggle('spin',!!st.playing);
     const pos=st.positionMs+(st.playing?performance.now()-at:0),dur=st.durationMs,f=dur>0?Math.min(1,pos/dur):0;
     $('pos').textContent=fmt(pos);$('dur').textContent=fmt(dur);$('fill').style.width=(f*100)+'%';
     bars.forEach((b,i)=>b.classList.toggle('d',(i+0.5)/N<=f));

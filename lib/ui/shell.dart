@@ -13,6 +13,7 @@ import '../state/download_notice.dart';
 import '../state/home_widgets.dart';
 import 'package:home_widget/home_widget.dart';
 import '../state/offline.dart';
+import '../state/taskbar_buttons.dart';
 import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
 import '../state/library.dart';
@@ -41,6 +42,7 @@ class _ShellState extends State<Shell> {
   StreamSubscription<String>? errors;
   HotkeyService? _hotkeys;
   GlobalHotkeyService? _globalHotkeys;
+  TaskbarButtons? _taskbar;
   DownloadNotice? _notice;
   HomeWidgetsSync? _widgets;
   StreamSubscription<Uri?>? _widgetClicks;
@@ -53,6 +55,13 @@ class _ShellState extends State<Shell> {
     });
     if (isDesktop) _hotkeys = HotkeyService(settings: context.read<Settings>(), run: _hotkey)..start();
     if (Platform.isWindows) _globalHotkeys = GlobalHotkeyService(settings: context.read<Settings>(), run: _globalHotkey)..start();
+    if (TaskbarButtons.supported) {
+      // after the window is up, so the taskbar has something to attach the buttons to
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (mounted) _taskbar = TaskbarButtons(context.read<PlayerController>())..start();
+      });
+    }
     if (Platform.isAndroid) {
       _notice = DownloadNotice(context.read<OfflineStore>())..start();
       _widgets = HomeWidgetsSync(context.read<PlayerController>())..start();
@@ -148,6 +157,7 @@ class _ShellState extends State<Shell> {
 
   @override
   void dispose() {
+    _taskbar?.dispose();
     _notice?.dispose();
     _widgets?.dispose();
     _widgetClicks?.cancel();
