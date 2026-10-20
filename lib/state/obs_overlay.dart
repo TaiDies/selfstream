@@ -209,11 +209,11 @@ class PlayerOverlaySource implements OverlaySource {
   }
 }
 
-/// The overlay page. Colours follow the cover. Options in the link: ?accent=%23rrggbb (a fixed colour instead)  ?scale=1.5  ?hide=paused (hide when paused or stopped)
+/// The overlay page. Colours follow the cover. Options in the link: ?accent=%23rrggbb (a fixed colour instead)  ?hide=paused (hide when paused or stopped)
 const String _page = r'''<!doctype html><html><head><meta charset="utf-8"><title>Selfstream overlay</title>
 <style>
-:root{--accent:#1db954;--card:#1a1a1e;--track:#0e0e10;--dim:#3a3a40;--scale:1}
-html,body{margin:0;background:transparent;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif;color:#fff}
+:root{--accent:#1db954;--card:#1a1a1e;--track:#0e0e10;--dim:#3a3a40;--scale:1.5}
+html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif;color:#fff}
 #wrap{width:520px;transform:scale(var(--scale));transform-origin:0 0;padding:12px;box-sizing:border-box;
   opacity:0;transition:opacity .5s ease}
 #wrap.on{opacity:1}
@@ -260,7 +260,9 @@ function fromCover(url){
     const [h,s]=rgb2hs(R/W,G/W,B/W);paint(h,s)}catch(e){paint(145,0.6)}};
   img.onerror=()=>paint(145,0.6);img.src=url;
 }
-const scale=parseFloat(q.get('scale'));if(scale>=0.3&&scale<=4)document.documentElement.style.setProperty('--scale',scale);
+// Shown 1.5 times bigger than its design size, or smaller if the OBS source is too small: it is never cut off.
+function fit(){const w=$('wrap'),k=Math.min(1.5,innerWidth/w.offsetWidth,innerHeight/w.offsetHeight);root.setProperty('--scale',k)}
+addEventListener('resize',fit);
 const hidePaused=q.get('hide')==='paused';
 const N=36,bars=[];for(let i=0;i<N;i++){const b=document.createElement('i');$('wave').appendChild(b);bars.push(b)}
 const fmt=ms=>{ms=Math.max(0,Math.floor(ms/1000));const m=Math.floor(ms/60),s=ms%60;return m+':'+String(s).padStart(2,'0')};
@@ -284,5 +286,5 @@ function frame(){
   }else wrap.classList.remove('on');
   requestAnimationFrame(frame);
 }
-poll();frame();
+fit();poll();frame();
 </script></body></html>''';
