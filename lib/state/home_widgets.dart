@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:home_widget/home_widget.dart';
 
@@ -144,7 +145,9 @@ class HomeWidgetsSync {
       }
       if (listId != 'liked' && songs.isEmpty) songs = (await player.api.playlist(listId)).songs;
       if (songs.isEmpty) return;
-      await player.playFromList(songs, index.clamp(0, songs.length - 1));
+      // -1 = the widget's play button: with shuffle on, begin at a random song instead of the first
+      final start = index < 0 ? (player.shuffle ? Random().nextInt(songs.length) : 0) : index.clamp(0, songs.length - 1);
+      await player.playFromList(songs, start);
     } catch (_) {}
   }
 }
