@@ -19,8 +19,7 @@ class HomeWidgetsSync {
     'dev.selfstream.widgets.ControlsWidget',
     'dev.selfstream.widgets.PlaylistsWidget',
   ];
-  static const maxSongs = 100;
-  static const maxLists = 30;
+  static const maxLists = 200;
 
   Timer? _debounce;
   Timer? _listDebounce;
@@ -35,6 +34,7 @@ class HomeWidgetsSync {
     _started = true;
     player.addListener(_changed);
     player.library.addListener(_listsChanged);
+    player.library.addListener(_changed); // the heart follows likes made anywhere
     SelfstreamAudio.onWidgetPlay = play;
     _changed();
     _listsChanged(delay: const Duration(seconds: 6));
@@ -47,6 +47,7 @@ class HomeWidgetsSync {
     _listDebounce?.cancel();
     player.removeListener(_changed);
     player.library.removeListener(_listsChanged);
+    player.library.removeListener(_changed);
     if (SelfstreamAudio.onWidgetPlay == play) SelfstreamAudio.onWidgetPlay = null;
   }
 
@@ -97,12 +98,12 @@ class HomeWidgetsSync {
     try {
       final lib = player.library;
       final lists = <({String id, String name, List<Song> songs})>[];
-      lists.add((id: 'liked', name: 'Liked songs', songs: lib.likedSongs.take(maxSongs).toList()));
+      lists.add((id: 'liked', name: 'Liked songs', songs: lib.likedSongs.toList()));
       for (final p in lib.playlists.take(maxLists)) {
         if (p.id.isEmpty) continue;
         try {
           final full = await player.api.playlist(p.id);
-          lists.add((id: p.id, name: p.name, songs: full.songs.take(maxSongs).toList()));
+          lists.add((id: p.id, name: p.name, songs: full.songs));
         } catch (_) {
           final cached = _songs[p.id];
           if (cached != null) lists.add((id: p.id, name: p.name, songs: cached));
@@ -117,13 +118,19 @@ class HomeWidgetsSync {
       }
       await HomeWidget.saveWidgetData<String>('pl_names', jsonEncode([for (final l in lists) {'id': l.id, 'name': l.name, 'n': l.songs.length}]));
       for (var i = 0; i < lists.length; i++) {
-        await HomeWidget.saveWidgetData<String>('pl_songs_$i', jsonEncode([for (final s in lists[i].songs) {'s': s.id, 't': s.title, 'a': s.artist}]));
+        await HomeWidget.saveWidgetData<String>('pl_songs_$i', jsonEncode([for (final s in lists[i].songs) {'s': s.id, 't': s.title, 'a': s.artist, 'c': _coverFor(s)}]));
       }
       await HomeWidget.updateWidget(qualifiedAndroidName: providers[1]);
     } catch (_) {
     } finally {
       _building = false;
     }
+  }
+
+  /// Where the widget can find a song's small cover: a saved file, or the (token-signed) address.
+  String _coverFor(Song s) {
+    if (s.coverArt.isEmpty) return '';
+    return player.coverPathFor(s) ?? player.api.coverUri(s.coverArt, size: 96).toString();
   }
 
   /// A song tapped in the playlists widget (or the playlist title: index 0).
@@ -136,7 +143,6 @@ class HomeWidgetsSync {
         songs = player.library.likedSongs;
       }
       if (listId != 'liked' && songs.isEmpty) songs = (await player.api.playlist(listId)).songs;
-      songs = songs.take(maxSongs).toList();
       if (songs.isEmpty) return;
       await player.playFromList(songs, index.clamp(0, songs.length - 1));
     } catch (_) {}
