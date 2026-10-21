@@ -279,6 +279,9 @@ class Api {
     if (login.statusCode >= 400 || j['token'] == null || j['id'] == null) {
       throw ApiException('Could not confirm your login to change the account.', status: login.statusCode);
     }
+    if (newUser != null && j['isAdmin'] == false) {
+      throw ApiException('Only an administrator can change the login name in Navidrome. You can still change your password, or ask your server admin to rename the account.');
+    }
     // Navidrome replaces the whole record on a PUT, so start from what it has now (name, admin status, ...)
     final auth = {'x-nd-authorization': 'Bearer ${j['token']}', 'content-type': 'application/json'};
     final userUri = Uri.parse('$server/api/user/${j['id']}');
