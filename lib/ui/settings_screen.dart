@@ -568,8 +568,10 @@ class _ChangeAccountDialogState extends State<ChangeAccountDialog> {
     try {
       await widget.session.changeAccount(newUser: newName, newPassword: newPass);
       if (!mounted) return;
-      Navigator.of(context).pop();
-      context.toast('Account updated');
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      await widget.session.signOut();
+      messenger.showSnackBar(const SnackBar(content: Text('Account updated. Sign in with your new details.'), duration: Duration(seconds: 5)));
     } catch (e) {
       if (mounted) {
         setState(() {

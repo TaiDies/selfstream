@@ -158,15 +158,11 @@ class Session extends ChangeNotifier {
     if (api == null || offlineMode) throw ApiException('Sign in first.');
     if (_prefs?.getString('cacheUser') == null) await _prefs?.setString('cacheUser', user);
     await api.changeAccount(newUser: newUser, newPassword: newPassword);
+    // the new details are not saved: you sign in again with them (see the settings dialog)
     if (newUser != null) {
       user = newUser;
       await _prefs!.setString('user', newUser);
     }
-    if (newPassword != null) {
-      _password = newPassword;
-      await _prefs!.setString('password', newPassword);
-    }
-    notifyListeners();
   }
 
   /// Open the app without signing in: downloaded songs, saved playlists and liked songs, no server needed.

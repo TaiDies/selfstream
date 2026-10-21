@@ -312,9 +312,9 @@ class Api {
       throw ApiException(msg, status: res.statusCode);
     }
     if (newUser != null) {
-      // make sure Navidrome really changed the login name, not just the display name
-      final after = _decode(await call('GET'));
-      if ('${after['userName']}' != newUser) {
+      // make sure the new login name really works (the old session token no longer does after a rename)
+      final check = await _send('POST', Uri.parse('$server/auth/login'), body: {'username': newUser, 'password': newPassword ?? password});
+      if (check.statusCode >= 400 || _decode(check)['token'] == null) {
         throw ApiException('Navidrome did not change the login name. Change it in the Navidrome web page instead.');
       }
     }
