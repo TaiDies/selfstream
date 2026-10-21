@@ -11,9 +11,12 @@ import 'caps.dart';
 import 'models.dart';
 
 class ApiException implements Exception {
-  ApiException(this.message, {this.status = 0});
+  ApiException(this.message, {this.status = 0, this.auth = false});
   final String message;
   final int status;
+
+  /// The server says this username/password is not valid (any more).
+  final bool auth;
   @override
   String toString() => message;
 }
@@ -161,7 +164,9 @@ class Api {
     if (r is! Map) throw ApiException('Unexpected answer from the server', status: status);
     if (r['status'] != 'ok') {
       final e = r['error'];
-      throw ApiException(e is Map ? '${e['message']}' : 'The server refused the request', status: status);
+      final bad = e is Map && e['code'] == 40; // Subsonic: wrong username or password
+      if (bad) _reportAuthLost();
+      throw ApiException(e is Map ? '${e['message']}' : 'The server refused the request', status: status, auth: bad);
     }
     return Map<String, dynamic>.from(r);
   }
@@ -353,6 +358,7 @@ class Api {
     }
     if (method == 'GET') _setOffline(false);
     final decoded = _decode(res);
+    if (res.statusCode == 401 && path != 'ping') unawaited(verifyLogin()); // maybe the account was changed: check for sure
     if (res.statusCode >= 400) {
       throw ApiException('${decoded['error'] ?? 'Request failed (${res.statusCode})'}', status: res.statusCode);
     }
@@ -489,7 +495,28 @@ class Api {
 
   static Map<String, dynamic> _asMap(Object? v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
 
+  final StreamController<void> _authLost = StreamController<void>.broadcast();
+
+  /// Fires when the server no longer accepts this login (the password or username was changed elsewhere).
+  Stream<void> get authLost => _authLost.stream;
+  bool _authReported = false;
+
+  void _reportAuthLost() {
+    if (_authReported || _authLost.isClosed) return;
+    _authReported = true;
+    _authLost.add(null);
+  }
+
+  /// Asks the server once whether the login still works; fires [authLost] only on a definite "wrong password".
+  Future<void> verifyLogin() async {
+    if (_forcedOffline || _authReported) return;
+    try {
+      await sub('ping');
+    } catch (_) {}
+  }
+
   void close() {
+    _authLost.close();
     _probe?.cancel();
     _http.close();
     _offlineChanges.close();

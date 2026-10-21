@@ -102,6 +102,11 @@ class Session extends ChangeNotifier {
   String user = '';
   String _password = '';
   Services? services;
+  StreamSubscription<void>? _authSub;
+  Timer? _authTimer;
+
+  /// Shown on the login screen after the app signed itself out.
+  String? notice;
   late Settings settings;
 
   String get currentPassword => _password;
@@ -141,6 +146,7 @@ class Session extends ChangeNotifier {
       throw ApiException('Fill in the server address, username and password.');
     }
     await _enter(s, userInput.trim(), password, verify: true);
+    notice = null;
     await _prefs!.setString('server', s);
     await _prefs!.setString('user', userInput.trim());
     await _prefs!.setString('cacheUser', userInput.trim());
@@ -183,8 +189,15 @@ class Session extends ChangeNotifier {
         rethrow;
       }
     }
+    _authSub?.cancel();
+    _authTimer?.cancel();
     services?.dispose();
     final svc = Services(api, settings, offlineOnly: offlineOnly);
+    if (!offlineOnly) {
+      _authSub = api.authLost.listen((_) => _lostLogin(api));
+      // an app left open still finds out soon that its account changed
+      _authTimer = Timer.periodic(const Duration(minutes: 3), (_) => api.verifyLogin());
+    }
     services = svc;
     offlineMode = offlineOnly;
     if (!offlineOnly) await _prefs?.remove('offlineMode');
@@ -195,11 +208,21 @@ class Session extends ChangeNotifier {
 
   @override
   void dispose() {
+    _authSub?.cancel();
+    _authTimer?.cancel();
     services?.dispose();
     super.dispose();
   }
 
+  Future<void> _lostLogin(Api api) async {
+    if (services?.api != api || offlineMode) return;
+    notice = 'Your account details changed. Sign in again with the new ones.';
+    await signOut();
+  }
+
   Future<void> signOut() async {
+    _authSub?.cancel();
+    _authTimer?.cancel();
     services?.dispose();
     services = null;
     offlineMode = false;

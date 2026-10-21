@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final s = context.read<Session>();
     server = TextEditingController(text: s.server);
     user = TextEditingController(text: s.user);
+    error = s.notice;
   }
 
   @override
