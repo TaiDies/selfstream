@@ -21,10 +21,10 @@ class LibraryScreen extends StatelessWidget {
     // (label, page): what the connected server cannot do simply has no tab
     final tabs = <(String, Widget)>[
       if (caps.has('playlists')) ('Playlists', const _PlaylistsTab()),
-      if (caps.has('follows')) ('Following', const _FollowingTab()),
       ('Liked', const _LikedTab()),
-      ('Albums', const _AlbumsTab()),
-      ('Artists', const _ArtistsTab()),
+      // with follows, these list what you follow; without, what the server has
+      ('Albums', caps.has('follows') ? const _FollowedTab('album') : const _AlbumsTab()),
+      ('Artists', caps.has('follows') ? const _FollowedTab('artist') : const _ArtistsTab()),
       if (!isDesktop) ('Offline', const _OfflineTab()),
     ];
     return DefaultTabController(
@@ -80,42 +80,51 @@ class _PlaylistsTab extends StatelessWidget {
   }
 }
 
-class _FollowingTab extends StatelessWidget {
-  const _FollowingTab();
+/// The albums or artists you follow (each one is kept up to date as its own playlist).
+class _FollowedTab extends StatelessWidget {
+  const _FollowedTab(this.kind);
+  final String kind;
+
   @override
   Widget build(BuildContext context) {
     final lib = context.watch<Library>();
-    if (lib.follows.isEmpty) {
-      return const EmptyNote('Follow an album, artist or playlist and it becomes its own playlist here and keeps itself up to date.', icon: Icons.favorite_border);
+    final items = [for (final f in lib.follows) if (f.kind == kind) f];
+    final artist = kind == 'artist';
+    if (items.isEmpty) {
+      return EmptyNote(artist ? 'Follow an artist and it shows up here.' : 'Follow an album and it shows up here.', icon: artist ? Icons.person_outline : Icons.album_outlined);
     }
-    return ListView(children: [
-      for (final f in lib.follows)
-        ListTile(
-          leading: Icon(f.kind == 'artist' ? Icons.person : f.kind == 'album' ? Icons.album : Icons.queue_music, size: 30),
-          title: Text(f.name.isEmpty ? f.remoteId : f.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: f.status == 'error'
-              ? const Text('Something went wrong. Tap retry.', style: TextStyle(color: Colors.orangeAccent))
-              : f.active
-                  ? Padding(padding: const EdgeInsets.only(top: 4), child: LinearProgressIndicator(value: f.total == 0 ? null : f.progress))
-                  : Text('${f.kind} · ${f.total} songs${f.done > 0 ? ' · ${f.done} saved on the server' : ''}${f.failed > 0 ? ' · ${f.failed} failed' : ''}', style: TextStyle(color: kMuted)),
-          trailing: f.status == 'error'
-              ? IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () async {
-                    await context.api.retryFollow(f.id);
-                    await lib.refresh();
-                  },
-                )
-              : IconButton(
-                  icon: Icon(Icons.favorite, color: kAccent),
-                  onPressed: () async {
-                    final remove = await confirm(context, 'Unfollow "${f.name}"?', 'Its playlist stays. It just stops updating.', ok: 'Unfollow');
-                    if (remove && context.mounted) await lib.unfollow(f);
-                  },
-                ),
-          onTap: f.playlistId.isEmpty ? null : () => context.open(PlaylistScreen(playlistId: f.playlistId, name: f.name)),
-        ),
-    ]);
+    String coverOf(Follow f) {
+      for (final p in lib.playlists) {
+        if (p.id == f.playlistId) return p.coverArt;
+      }
+      return '';
+    }
+
+    return RefreshIndicator(
+      onRefresh: lib.refresh,
+      child: GridView.builder(
+        padding: const EdgeInsets.all(12),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 180, childAspectRatio: 0.78),
+        itemCount: items.length,
+        itemBuilder: (_, i) {
+          final f = items[i];
+          return GestureDetector(
+            onLongPress: () async {
+              final remove = await confirm(context, 'Unfollow "${f.name}"?', 'Its playlist stays. It just stops updating.', ok: 'Unfollow');
+              if (remove && context.mounted) await lib.unfollow(f);
+            },
+            child: CardTile(
+              coverId: coverOf(f),
+              title: f.name.isEmpty ? f.remoteId : f.name,
+              subtitle: f.status == 'error' ? 'Something went wrong' : (f.active ? 'Updating…' : (artist ? '${f.total} songs' : f.artist)),
+              circle: artist,
+              width: 170,
+              onTap: f.playlistId.isEmpty ? null : () => context.open(PlaylistScreen(playlistId: f.playlistId, name: f.name)),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
