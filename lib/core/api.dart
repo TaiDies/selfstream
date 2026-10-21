@@ -284,9 +284,8 @@ class Api {
     if (login.statusCode >= 400 || j['token'] == null || j['id'] == null) {
       throw ApiException('Could not confirm your login to change the account.', status: login.statusCode);
     }
-    if (newUser != null && j['isAdmin'] == false) {
-      throw ApiException('Only an administrator can change the login name in Navidrome. You can still change your password, or ask your server admin to rename the account.');
-    }
+    // Navidrome lets only administrators change a username: for everyone else the selfstream server does it for them
+    final viaServer = newUser != null && j['isAdmin'] == false;
     // Navidrome replaces the whole record on a PUT, so start from what it has now (name, admin status, ...)
     final auth = {'x-nd-authorization': 'Bearer ${j['token']}', 'content-type': 'application/json'};
     final userUri = Uri.parse('$server/api/user/${j['id']}');
@@ -300,11 +299,12 @@ class Api {
       }
     }
 
-    final current = await call('GET');
+    final needsNative = !viaServer || newPassword != null;
+    final current = needsNative ? await call('GET') : http.Response('{}', 200);
     if (current.statusCode >= 400) throw ApiException('Could not read your account from Navidrome (${current.statusCode}).', status: current.statusCode);
     final body = _decode(current);
     body.remove('password');
-    if (newUser != null) {
+    if (newUser != null && !viaServer) {
       body['userName'] = newUser;
       body['name'] = newUser;
     }
@@ -312,13 +312,18 @@ class Api {
       body['password'] = newPassword;
       body['currentPassword'] = password;
     }
-    final res = await call('PUT', body);
+    final res = needsNative ? await call('PUT', body) : http.Response('{}', 200);
     if (res.statusCode >= 400) {
       final d = _decode(res);
       final errs = d['errors'];
       final msg = errs is Map && errs.isNotEmpty ? errs.values.join(', ') : '${d['error'] ?? d['message'] ?? 'Navidrome refused the change (${res.statusCode})'}';
       throw ApiException(msg, status: res.statusCode);
     }
+    if (needsNative && newPassword != null) {
+      password = newPassword; // from here on the new password is the one that works
+      _coverUris.clear();
+    }
+    if (viaServer) await _v1Call('POST', 'account/username', body: {'userName': newUser});
     if (newUser != null) {
       // make sure the new login name really works (the old session token no longer does after a rename)
       final check = await _send('POST', Uri.parse('$server/auth/login'), body: {'username': newUser, 'password': newPassword ?? password});
