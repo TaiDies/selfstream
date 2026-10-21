@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api.dart';
 import '../platform/platform.dart';
 import '../state/global_hotkeys.dart';
 import '../state/hotkeys.dart';
@@ -29,7 +30,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<Settings>();
     final off = context.watch<OfflineStore>();
-    final session = context.read<Session>();
+    final session = context.watch<Session>();
     return PageFrame(
       title: 'Settings',
       miniPlayer: !embedded,
@@ -230,7 +231,13 @@ class SettingsScreen extends StatelessWidget {
               await session.signOut();
             },
           )
-        else
+        else ...[
+          ListTile(
+            leading: const Icon(Icons.manage_accounts_outlined),
+            title: const Text('Change username or password'),
+            subtitle: Text('Your Navidrome login (${session.user})'),
+            onTap: () => showDialog<void>(context: context, builder: (_) => ChangeAccountDialog(session: session)),
+          ),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sign out'),
@@ -242,6 +249,7 @@ class SettingsScreen extends StatelessWidget {
               await session.signOut();
             },
           ),
+        ],
         Padding(
           padding: EdgeInsets.all(20),
           child: Text('Selfstream 0.3\nYour music, playlists and listening history live on your own server.', style: TextStyle(color: kMuted, fontSize: 12)),
@@ -503,5 +511,93 @@ class _GlobalShortcutsList extends StatelessWidget {
         onTap: () => settings.globalHotkeys = '',
       ),
     ]);
+  }
+}
+
+
+/// Change the Navidrome username and/or password (needs the current password).
+class ChangeAccountDialog extends StatefulWidget {
+  const ChangeAccountDialog({super.key, required this.session});
+  final Session session;
+
+  @override
+  State<ChangeAccountDialog> createState() => _ChangeAccountDialogState();
+}
+
+class _ChangeAccountDialogState extends State<ChangeAccountDialog> {
+  late final TextEditingController _name = TextEditingController(text: widget.session.user);
+  final _pass = TextEditingController();
+  final _pass2 = TextEditingController();
+  final _current = TextEditingController();
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _pass.dispose();
+    _pass2.dispose();
+    _current.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    final newName = name.isNotEmpty && name != widget.session.user ? name : null;
+    final newPass = _pass.text.isEmpty ? null : _pass.text;
+    if (newName == null && newPass == null) {
+      setState(() => _error = 'Change the username or enter a new password.');
+      return;
+    }
+    if (newPass != null && newPass != _pass2.text) {
+      setState(() => _error = 'The two new passwords are different.');
+      return;
+    }
+    if (_current.text.isEmpty) {
+      setState(() => _error = 'Enter your current password.');
+      return;
+    }
+    if (_current.text != widget.session.currentPassword) {
+      setState(() => _error = 'The current password is wrong.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.session.changeAccount(newUser: newName, newPassword: newPass);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      context.toast('Account updated');
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = e is ApiException ? e.message : '$e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Change account'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: _name, decoration: const InputDecoration(labelText: 'Username')),
+          TextField(controller: _pass, obscureText: true, decoration: const InputDecoration(labelText: 'New password (leave empty to keep)')),
+          TextField(controller: _pass2, obscureText: true, decoration: const InputDecoration(labelText: 'Repeat new password')),
+          TextField(controller: _current, obscureText: true, decoration: const InputDecoration(labelText: 'Current password'), onSubmitted: (_) => _save()),
+          if (_error != null)
+            Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13))),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Saving…' : 'Save')),
+      ],
+    );
   }
 }

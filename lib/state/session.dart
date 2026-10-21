@@ -104,6 +104,8 @@ class Session extends ChangeNotifier {
   Services? services;
   late Settings settings;
 
+  String get currentPassword => _password;
+
   bool get signedIn => services != null;
 
   /// Signed out but using the libraries saved on this device (see [enterOfflineMode]).
@@ -141,10 +143,29 @@ class Session extends ChangeNotifier {
     await _enter(s, userInput.trim(), password, verify: true);
     await _prefs!.setString('server', s);
     await _prefs!.setString('user', userInput.trim());
+    await _prefs!.setString('cacheUser', userInput.trim());
     await _prefs!.setString('password', password);
     server = s;
     user = userInput.trim();
     _password = password;
+    notifyListeners();
+  }
+
+  /// Change the Navidrome username and/or password; the saved login and the open session follow.
+  /// Saved copies stay under the name they were first saved with, so nothing is lost.
+  Future<void> changeAccount({String? newUser, String? newPassword}) async {
+    final api = services?.api;
+    if (api == null || offlineMode) throw ApiException('Sign in first.');
+    if (_prefs?.getString('cacheUser') == null) await _prefs?.setString('cacheUser', user);
+    await api.changeAccount(newUser: newUser, newPassword: newPassword);
+    if (newUser != null) {
+      user = newUser;
+      await _prefs!.setString('user', newUser);
+    }
+    if (newPassword != null) {
+      _password = newPassword;
+      await _prefs!.setString('password', newPassword);
+    }
     notifyListeners();
   }
 
@@ -157,7 +178,7 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> _enter(String s, String u, String p, {required bool verify, bool offlineOnly = false}) async {
-    final api = Api(server: s, user: u, password: p, cache: FileResponseCache('$s|$u'));
+    final api = Api(server: s, user: u, password: p, cache: FileResponseCache('$s|${_prefs?.getString('cacheUser') ?? u}'));
     if (verify) {
       try {
         await api.checkLogin();

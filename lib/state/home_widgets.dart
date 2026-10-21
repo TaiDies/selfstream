@@ -111,7 +111,7 @@ class HomeWidgetsSync {
         }
         if (!_started) return;
       }
-      final sig = lists.map((l) => '${l.id}:${l.name}:${l.songs.map((s) => s.id).join(',')}').join('|');
+      final sig = lists.map((l) => '${l.id}:${l.name}:${l.songs.map((s) => '${s.id}${_coverFor(s)}').join(',')}').join('|');
       if (sig == _lastLists) return;
       _lastLists = sig;
       for (final l in lists) {

@@ -50,18 +50,38 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Future<void> _remove(Song s) async {
     final id = s.playlistItemId;
     if (id == null) return;
+    final at = pl!.songs.indexWhere((x) => x.playlistItemId == id);
     setState(() => pl!.songs.removeWhere((x) => x.playlistItemId == id));
     final api = context.api;
     final lib = context.lib;
     try {
       await api.removeFromPlaylist(widget.playlistId, id);
       await lib.refresh();
+      if (mounted) context.toastUndo('Removed from playlist', () => _restore(s, at));
     } catch (e) {
       if (mounted) {
         context.toast('Could not remove: $e');
         _load();
       }
     }
+  }
+
+  /// Undo: put the song back where it was.
+  Future<void> _restore(Song s, int at) async {
+    final api = context.api;
+    final lib = context.lib;
+    await api.addToPlaylist(widget.playlistId, [s]);
+    final r = await api.playlist(widget.playlistId);
+    final ids = [for (final x in r.songs) if (x.playlistItemId != null) x.playlistItemId!];
+    if (ids.length > 1 && at >= 0 && at < ids.length - 1) {
+      final added = ids.removeLast();
+      ids.insert(at, added);
+      try {
+        await api.reorderPlaylist(widget.playlistId, ids);
+      } catch (_) {}
+    }
+    await lib.refresh();
+    if (mounted) _load();
   }
 
   Future<void> _reorder(int from, int to) async {

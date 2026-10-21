@@ -35,8 +35,10 @@ abstract class ResponseCache {
 }
 
 class Api {
-  Api({required this.server, required this.user, required this.password, http.Client? client, this.cache})
-      : _http = client ?? http.Client();
+  Api({required this.server, required String user, required String password, http.Client? client, this.cache})
+      : user = user,
+        password = password,
+        _http = client ?? http.Client();
 
   final ResponseCache? cache;
 
@@ -108,8 +110,8 @@ class Api {
   }
 
   final String server;
-  final String user;
-  final String password;
+  String user;
+  String password;
   final http.Client _http;
   final Random _rng = Random.secure();
 
@@ -267,6 +269,40 @@ class Api {
   }
 
   Future<Lyrics?> lyrics(String id) async => parseLyrics(await lyricsRaw(id));
+
+  /// Changes this account's username and/or password in Navidrome itself (through the server, which passes it on).
+  /// Throws [ApiException] with the reason when Navidrome refuses.
+  Future<void> changeAccount({String? newUser, String? newPassword}) async {
+    if (newUser == null && newPassword == null) return;
+    final login = await _send('POST', Uri.parse('$server/auth/login'), body: {'username': user, 'password': password});
+    final j = _decode(login);
+    if (login.statusCode >= 400 || j['token'] == null || j['id'] == null) {
+      throw ApiException('Could not confirm your login to change the account.', status: login.statusCode);
+    }
+    final body = <String, Object?>{
+      if (newUser != null) ...{'userName': newUser, 'name': newUser},
+      if (newPassword != null) ...{'password': newPassword, 'currentPassword': password},
+    };
+    http.Response res;
+    try {
+      final req = http.Request('PUT', Uri.parse('$server/api/user/${j['id']}'))
+        ..headers['content-type'] = 'application/json'
+        ..headers['x-nd-authorization'] = 'Bearer ${j['token']}'
+        ..body = jsonEncode(body);
+      res = await http.Response.fromStream(await _http.send(req).timeout(_timeout));
+    } catch (e) {
+      throw ApiException('Cannot reach the server ($e)');
+    }
+    if (res.statusCode >= 400) {
+      final d = _decode(res);
+      final errs = d['errors'];
+      final msg = errs is Map && errs.isNotEmpty ? errs.values.join(', ') : '${d['error'] ?? d['message'] ?? 'Navidrome refused the change (${res.statusCode})'}';
+      throw ApiException(msg, status: res.statusCode);
+    }
+    if (newUser != null) user = newUser;
+    if (newPassword != null) password = newPassword;
+    _coverUris.clear(); // the addresses carry the login
+  }
 
   // ------------------------------------------------------- selfstream v1
   static const String _v1 = '/selfstream/api/v1/';

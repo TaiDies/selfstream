@@ -54,6 +54,29 @@ extension AppContext on BuildContext {
   /// Does the connected server offer this feature?
   bool has(String feature) => read<CapsHolder>().has(feature);
 
+  /// A white bar for 5 seconds with an Undo button (removing a song from a playlist, unliking).
+  void toastUndo(String message, Future<void> Function() undo) {
+    final m = ScaffoldMessenger.of(this);
+    m
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message, style: const TextStyle(color: Color(0xFF111111), fontWeight: FontWeight.w600)),
+        backgroundColor: Colors.white,
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Undo',
+          textColor: const Color(0xFF1B7F3B),
+          onPressed: () async {
+            try {
+              await undo();
+            } catch (e) {
+              m.showSnackBar(SnackBar(content: Text('Could not undo: $e'), duration: const Duration(seconds: 3)));
+            }
+          },
+        ),
+      ));
+  }
+
   void toast(String message) {
     ScaffoldMessenger.of(this)
       ..hideCurrentSnackBar()
@@ -313,7 +336,11 @@ Future<void> likeWithToast(BuildContext context, Song s) async {
   try {
     await lib.toggleLike(s);
     if (context.mounted) {
-      context.toast(wasLiked ? 'Removed from liked songs' : (s.isCloud && context.read<Settings>().likeDownloadsToServer ? 'Liked, downloading to your library' : 'Added to liked songs'));
+      if (wasLiked) {
+        context.toastUndo('Removed from liked songs', () => lib.toggleLike(s));
+      } else {
+        context.toast(s.isCloud && context.read<Settings>().likeDownloadsToServer ? 'Liked, downloading to your library' : 'Added to liked songs');
+      }
     }
   } catch (e) {
     if (context.mounted) context.toast('Could not update: $e');
