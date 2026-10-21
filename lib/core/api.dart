@@ -279,25 +279,44 @@ class Api {
     if (login.statusCode >= 400 || j['token'] == null || j['id'] == null) {
       throw ApiException('Could not confirm your login to change the account.', status: login.statusCode);
     }
-    final body = <String, Object?>{
-      if (newUser != null) ...{'userName': newUser, 'name': newUser},
-      if (newPassword != null) ...{'password': newPassword, 'currentPassword': password},
-    };
-    http.Response res;
-    try {
-      final req = http.Request('PUT', Uri.parse('$server/api/user/${j['id']}'))
-        ..headers['content-type'] = 'application/json'
-        ..headers['x-nd-authorization'] = 'Bearer ${j['token']}'
-        ..body = jsonEncode(body);
-      res = await http.Response.fromStream(await _http.send(req).timeout(_timeout));
-    } catch (e) {
-      throw ApiException('Cannot reach the server ($e)');
+    // Navidrome replaces the whole record on a PUT, so start from what it has now (name, admin status, ...)
+    final auth = {'x-nd-authorization': 'Bearer ${j['token']}', 'content-type': 'application/json'};
+    final userUri = Uri.parse('$server/api/user/${j['id']}');
+    Future<http.Response> call(String method, [Object? payload]) async {
+      final req = http.Request(method, userUri)..headers.addAll(auth);
+      if (payload != null) req.body = jsonEncode(payload);
+      try {
+        return await http.Response.fromStream(await _http.send(req).timeout(_timeout));
+      } catch (e) {
+        throw ApiException('Cannot reach the server ($e)');
+      }
     }
+
+    final current = await call('GET');
+    if (current.statusCode >= 400) throw ApiException('Could not read your account from Navidrome (${current.statusCode}).', status: current.statusCode);
+    final body = _decode(current);
+    body.remove('password');
+    if (newUser != null) {
+      body['userName'] = newUser;
+      body['name'] = newUser;
+    }
+    if (newPassword != null) {
+      body['password'] = newPassword;
+      body['currentPassword'] = password;
+    }
+    final res = await call('PUT', body);
     if (res.statusCode >= 400) {
       final d = _decode(res);
       final errs = d['errors'];
       final msg = errs is Map && errs.isNotEmpty ? errs.values.join(', ') : '${d['error'] ?? d['message'] ?? 'Navidrome refused the change (${res.statusCode})'}';
       throw ApiException(msg, status: res.statusCode);
+    }
+    if (newUser != null) {
+      // make sure Navidrome really changed the login name, not just the display name
+      final after = _decode(await call('GET'));
+      if ('${after['userName']}' != newUser) {
+        throw ApiException('Navidrome did not change the login name. Change it in the Navidrome web page instead.');
+      }
     }
     if (newUser != null) user = newUser;
     if (newPassword != null) password = newPassword;
