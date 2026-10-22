@@ -34,6 +34,9 @@ jobs:
         run: flutter pub get
       - name: Analyze
         run: flutter analyze --no-fatal-infos 2>&1 | tee win-analyze.log
+      - name: Test
+        continue-on-error: true  # shown as a warning for now; the same tests already gate the Android build
+        run: flutter test
       - name: Build
         run: set -o pipefail; flutter build windows --release --dart-define=BUILD_NUMBER=${{ github.run_number }} 2>&1 | tee win-build.log
       - name: Zip

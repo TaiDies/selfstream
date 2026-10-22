@@ -11,6 +11,10 @@ void main() {
     expect(normalizeServer('192.168.1.5:8080'), 'http://192.168.1.5:8080');
     expect(normalizeServer(' https://music.example.com/ '), 'https://music.example.com');
     expect(normalizeServer(''), '');
+    expect(normalizeServer('music.example.com'), 'https://music.example.com'); // a public name: https first
+    expect(normalizeServer('music.example.com:8080'), 'http://music.example.com:8080'); // with a port: as typed, plain
+    expect(normalizeServer('nas'), 'http://nas');
+    expect(normalizeServer('selfstream.local'), 'http://selfstream.local');
   });
 
   test('login token follows the Subsonic scheme', () {
@@ -84,6 +88,15 @@ void main() {
     api.setForcedOffline(true); // device has no network at all
     expect((await api.starred()).songs.first.id, 'a1');
     await expectLater(api.playlists(), throwsA(isA<ApiException>()));
+  });
+
+  test('which hosts count as a home network', () {
+    for (final h in ['localhost', '192.168.1.5', '10.0.0.2', '172.16.4.1', '172.31.255.1', '127.0.0.1', '100.101.1.1', 'nas', 'a.local', '::1', 'fd12:3456::1']) {
+      expect(isPrivateHost(h), isTrue, reason: h);
+    }
+    for (final h in ['music.example.com', '8.8.8.8', '172.32.0.1', '100.128.0.1', '2001:db8::1', '192.169.1.1']) {
+      expect(isPrivateHost(h), isFalse, reason: h);
+    }
   });
 }
 

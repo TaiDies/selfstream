@@ -110,6 +110,9 @@ What this server offers. The app calls it after sign-in and builds its tabs from
 | `state` | "continue where you left off" queue across devices | `state/{key}` |
 | `suggest` | search-as-you-type suggestions | `suggest` |
 | `presence` | Windows: Discord "now playing" card. List it only when you have a Discord application ID (`clientId` in the answer); without it the app shows the setting greyed out | `presence` |
+| `genres` | genre information for songs and artists (used by Discover) | (your own screens) |
+| `remote-playlists` | browse playlists outside your library | `remote/playlists*` |
+| `app-update` | the Android test build can update itself from this server | `app/android*` |
 | `share` | "Share" in song menus and the player: copies the link the server returns | `GET share` |
 | `like-download` | a setting "Liking downloads to the server" | `star` accepts `ssDownload=0` |
 
@@ -172,7 +175,7 @@ Responses are saved on the device, so the last version of each screen shows when
 | `GET playlists/{id}` | playlist with `songs`; every song has a `playlistItemId` |
 | `PATCH playlists/{id}` | `{name?, description?}` |
 | `DELETE playlists/{id}` | |
-| `POST playlists/{id}/songs` | `{songs: [song], skipExisting?: bool}` -> `{added, playlist}` |
+| `POST playlists/{id}/songs` | `{songs: [song]}` -> `{added, playlist}`; songs already in the playlist are skipped, and the server answers 409 when nothing was new |
 | `DELETE playlists/{id}/songs/{playlistItemId}` | |
 | `PUT playlists/{id}/order` | `{itemIds: [playlistItemId, ...]}` |
 
@@ -202,6 +205,9 @@ A follow turns an item the server knows about into a playlist that keeps itself 
 | Request | Answer |
 |---|---|
 | `GET state/{key}` / `PUT state/{key}` (`{"value": any}`) | small per-user storage, max 200 kB. The app stores key `queue` |
+| `GET home` | the Home page content (the app uses it when the manifest has no Home screen of its own) |
+| `POST account/username` | `{userName}`: a user asks for a new username. The server changes it with a delegate administrator account (Navidrome only lets administrators do that) and moves the user's saved data along. 503 until the server admin has set this up |
+| `GET app/android` / `GET app/android/download` | `{build, version, size, name}` and the APK: the Android test build offers itself as an update (feature `app-update`) |
 | `GET suggest?q=` | `{"suggestions": ["...", ...]}` (up to 8) |
 | `GET presence?id=&title=&artist=&album=` | `{clientId, details, state, largeImage, largeText, buttons: [{label, url}]}`, the card the Windows app hands to Discord. `largeImage` must be a public URL |
 | `GET share?id=&title=&artist=` | `{url, title, artist}`: the link copied by Share (404 if none). Use the same URL as the button in `presence` |

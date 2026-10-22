@@ -25,26 +25,27 @@ class OfflineStore extends ChangeNotifier {
   // The current run of downloads (a queue worked through one song at a time), for the controls and the notification.
   int batchTotal = 0, batchDone = 0, batchFailed = 0;
   final List<_Job> _queue = [];
-  _Job? _current;
+  final Set<_Job> _active = {}; // songs being downloaded right now (several at once: one is mostly waiting on the server)
+  static const int _parallel = 10;
   bool paused = false;
-  bool _running = false;
-  bool _abort = false;
-  Completer<void>? _resume;
-  bool get busy => _running || _queue.isNotEmpty;
+  int _gen = 0; // moves on at every pause or stop: a download started before that sees it and gives up, later ones are not affected
+  http.Client? _http; // shared, so connections are reused between songs
+  Timer? _indexTimer;
+  bool get busy => _active.isNotEmpty || _queue.isNotEmpty;
   void resetBatch() => batchTotal = batchDone = batchFailed = 0;
 
   /// Stop after interrupting the song in progress; it starts over from the beginning when resumed.
   void pause() {
     if (!busy || paused) return;
     paused = true;
-    _abort = true;
+    _gen++;
     notifyListeners();
   }
 
   void resume() {
     if (!paused) return;
     paused = false;
-    _resume?.complete();
+    _pump();
     notifyListeners();
   }
 
@@ -56,10 +57,11 @@ class OfflineStore extends ChangeNotifier {
     }
     _queue.clear();
     batchTotal = batchDone;
-    _current?.cancelled = true;
-    _abort = true;
+    for (final j in _active) {
+      j.cancelled = true;
+    }
+    _gen++;
     paused = false;
-    _resume?.complete();
     notifyListeners();
   }
 
@@ -250,48 +252,62 @@ class OfflineStore extends ChangeNotifier {
   Future<void> downloadAll(Iterable<Song> songs) => Future.wait(songs.map(_enqueue).toList());
 
   Future<void> _enqueue(Song s) {
-    if (_dir == null || has(s.id) || (_current?.song.id == s.id) || _queue.any((j) => j.song.id == s.id)) return Future.value();
+    if (_dir == null || has(s.id) || _active.any((j) => j.song.id == s.id) || _queue.any((j) => j.song.id == s.id)) return Future.value();
     if (!busy) resetBatch();
     final job = _Job(s);
     _queue.add(job);
     batchTotal++;
     notifyListeners();
-    if (!_running) {
-      _running = true;
-      unawaited(_drain());
-    }
+    _pump();
     return job.done.future;
   }
 
-  Future<void> _drain() async {
-    try {
-      while (_queue.isNotEmpty) {
-        if (paused) {
-          _resume = Completer<void>();
-          await _resume!.future;
-          continue;
-        }
-        final job = _queue.removeAt(0);
-        _current = job;
-        _abort = false;
-        final finished = await _fetch(job.song);
-        _current = null;
-        if (!finished && !job.cancelled) {
-          _queue.insert(0, job); // paused mid-song: start it again on resume
-          continue;
-        }
-        if (!job.cancelled) {
-          if (failed.containsKey(job.song.id)) batchFailed++;
-          batchDone++;
-        }
-        job.done.complete();
-        notifyListeners();
-      }
-    } finally {
-      _running = false;
-      _current = null;
-      notifyListeners();
+  /// Starts songs until [_parallel] are in flight.
+  void _pump() {
+    if (paused) return;
+    while (_active.length < _parallel && _queue.isNotEmpty) {
+      final job = _queue.removeAt(0);
+      _active.add(job);
+      unawaited(_run(job));
     }
+  }
+
+  Future<void> _run(_Job job) async {
+    var finished = true;
+    try {
+      finished = await _fetch(job.song);
+    } catch (_) {}
+    _active.remove(job);
+    if (!finished && !job.cancelled) {
+      _queue.insert(0, job); // paused mid-song: start it again on resume
+    } else {
+      if (!job.cancelled) {
+        if (failed.containsKey(job.song.id)) batchFailed++;
+        batchDone++;
+      }
+      job.done.complete();
+    }
+    if (_active.isEmpty && _queue.isEmpty) {
+      _http?.close();
+      _http = null;
+      await _flushIndex();
+    }
+    notifyListeners();
+    _pump();
+  }
+
+  void _saveIndexSoon() {
+    _indexTimer ??= Timer(const Duration(seconds: 3), () {
+      _indexTimer = null;
+      unawaited(_saveIndex());
+    });
+  }
+
+  Future<void> _flushIndex() async {
+    if (_indexTimer == null) return;
+    _indexTimer!.cancel();
+    _indexTimer = null;
+    await _saveIndex();
   }
 
   /// Saves one song. Returns false if it was interrupted (paused or stopped) before it finished.
@@ -302,8 +318,10 @@ class OfflineStore extends ChangeNotifier {
     notifyListeners();
     final name = '${s.id.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.audio';
     final file = File('${_dir!.path}/$name');
-    final client = http.Client();
+    final client = _http ??= http.Client();
     var interrupted = false;
+    var lastTick = DateTime.now();
+    final gen = _gen;
     try {
       final res = await client.send(http.Request('GET', api.streamUri(s.id, maxBitRate: settings.maxBitRate)));
       if (res.statusCode >= 300) throw ApiException('Server answered ${res.statusCode}');
@@ -311,7 +329,7 @@ class OfflineStore extends ChangeNotifier {
       var received = 0;
       final total = res.contentLength ?? 0;
       await for (final chunk in res.stream) {
-        if (_abort) {
+        if (_gen != gen) {
           interrupted = true;
           break;
         }
@@ -319,7 +337,11 @@ class OfflineStore extends ChangeNotifier {
         received += chunk.length;
         if (total > 0) {
           progress[s.id] = received / total;
-          notifyListeners();
+          final now = DateTime.now();
+          if (now.difference(lastTick).inMilliseconds > 250) {
+            lastTick = now; // redrawing on every chunk would cost more time than the download
+            notifyListeners();
+          }
         }
       }
       await sink.close();
@@ -330,15 +352,16 @@ class OfflineStore extends ChangeNotifier {
         return false;
       }
       if (received < 1000) throw ApiException('Empty answer');
+      if (total > 0 && received != total && res.headers['content-encoding'] == null) throw ApiException('The download was cut off');
       _index[s.id] = {'file': name, 'song': s.toJson()};
-      await _saveIndex();
+      _saveIndexSoon();
       try {
         await _saveLyrics(s.id);
       } catch (_) {}
       await _saveCover(s.coverArt);
       return true;
     } catch (e) {
-      if (_abort) {
+      if (_gen != gen) {
         try {
           if (await file.exists()) await file.delete();
         } catch (_) {}
@@ -350,7 +373,6 @@ class OfflineStore extends ChangeNotifier {
       } catch (_) {}
       return true;
     } finally {
-      client.close();
       progress.remove(s.id);
       notifyListeners();
     }

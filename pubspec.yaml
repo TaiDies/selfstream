@@ -12,6 +12,7 @@ dependencies:
   http: ^1.2.2
   provider: ^6.1.2
   shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.2
   just_audio: ^0.9.40
   audio_service: ^0.18.15
   home_widget: ^0.7.0

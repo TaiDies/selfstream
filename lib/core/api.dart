@@ -24,11 +24,29 @@ class ApiException implements Exception {
 String normalizeServer(String input) {
   var s = input.trim();
   if (s.isEmpty) return s;
-  if (!s.startsWith('http://') && !s.startsWith('https://')) s = 'http://$s';
+  if (!s.startsWith('http://') && !s.startsWith('https://')) {
+    // a home server (private address) or one given with a port is usually plain http; a public name is tried with https
+    final u = Uri.tryParse('http://$s');
+    s = u != null && (isPrivateHost(u.host) || u.hasPort) ? 'http://$s' : 'https://$s';
+  }
   while (s.endsWith('/')) {
     s = s.substring(0, s.length - 1);
   }
   return s;
+}
+
+/// Is this host on a home or local network (or a VPN like Tailscale)? Plain http there is normal.
+bool isPrivateHost(String host) {
+  final h = host.toLowerCase();
+  if (h.isEmpty || h == 'localhost' || h.endsWith('.local') || h.endsWith('.lan') || h.endsWith('.home.arpa') || h.endsWith('.ts.net')) return true;
+  if (h.contains(':')) return h == '::1' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd'); // IPv6: loopback, link-local, unique-local
+  if (!h.contains('.')) return true; // a bare machine name such as "nas"
+  final p = h.split('.');
+  if (p.length != 4) return false;
+  final n = p.map(int.tryParse).toList();
+  if (n.any((x) => x == null || x < 0 || x > 255)) return false;
+  final a = n[0]!, b = n[1]!;
+  return a == 10 || a == 127 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31) || (a == 169 && b == 254) || (a == 100 && b >= 64 && b <= 127);
 }
 
 /// Where answers are kept so pages still open without a connection. Implemented per platform.

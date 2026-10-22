@@ -323,8 +323,14 @@ class _OfflineTab extends StatelessWidget {
         ]),
       ),
       if (songs.isNotEmpty) PlayButtons(songs: songs),
-      for (final id in off.progress.keys)
-        ListTile(leading: const Icon(Icons.downloading), title: const Text('Saving...'), subtitle: LinearProgressIndicator(value: off.progress[id])),
+      if (off.progress.isNotEmpty) // one bar for the whole batch, however many songs are in flight
+        ListTile(
+          leading: const Icon(Icons.downloading),
+          title: Text(off.batchTotal > 1 ? 'Saving ${off.batchDone} of ${off.batchTotal}...' : 'Saving...'),
+          subtitle: LinearProgressIndicator(
+            value: off.batchTotal == 0 ? null : ((off.batchDone + off.progress.values.fold<double>(0, (a, b) => a + b)) / off.batchTotal).clamp(0.0, 1.0),
+          ),
+        ),
       for (var i = 0; i < songs.length; i++) SongTile(song: songs[i], onTap: () => context.player.playSongs(songs, start: i)),
     ]);
   }

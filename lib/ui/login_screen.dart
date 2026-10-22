@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api.dart';
 import '../state/session.dart';
 import 'widgets.dart';
 
@@ -41,6 +42,20 @@ class _LoginScreenState extends State<LoginScreen> {
       error = null;
     });
     try {
+      final addr = Uri.tryParse(normalizeServer(server.text));
+      if (addr != null && addr.scheme == 'http' && !isPrivateHost(addr.host)) {
+        final go = await confirm(
+          context,
+          'This server is not encrypted',
+          'It is on the internet and uses plain http, so your password and what you play can be read by others on the way. Use an https address if the server has one.',
+          ok: 'Sign in anyway',
+        );
+        if (!go) {
+          if (mounted) setState(() => busy = false);
+          return;
+        }
+      }
+      if (!mounted) return;
       await context.read<Session>().signIn(server.text, user.text, password.text);
     } catch (e) {
       if (mounted) setState(() => error = e.toString());

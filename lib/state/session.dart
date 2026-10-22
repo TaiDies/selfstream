@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/api.dart';
@@ -97,6 +98,41 @@ class Services {
 /// Server address + login, kept on the device. Signing in creates [services].
 class Session extends ChangeNotifier {
   SharedPreferences? _prefs;
+  static const FlutterSecureStorage _vault = FlutterSecureStorage();
+  static const Duration _vaultWait = Duration(seconds: 4); // a broken keystore must never keep the app from starting
+
+  /// The saved password lives in the system's secure storage (Android Keystore, Windows Credential store).
+  /// One saved by an earlier version in the plain settings is moved there.
+  Future<String> _readPassword() async {
+    try {
+      final v = await _vault.read(key: 'password').timeout(_vaultWait);
+      if (v != null && v.isNotEmpty) return v;
+    } catch (_) {}
+    final old = _prefs!.getString('password') ?? '';
+    if (old.isNotEmpty) {
+      try {
+        await _vault.write(key: 'password', value: old).timeout(_vaultWait);
+        await _prefs!.remove('password');
+      } catch (_) {} // secure storage unavailable: keep using the old copy rather than log you out
+    }
+    return old;
+  }
+
+  Future<void> _savePassword(String password) async {
+    try {
+      await _vault.write(key: 'password', value: password).timeout(_vaultWait);
+      await _prefs!.remove('password');
+    } catch (_) {
+      await _prefs!.setString('password', password);
+    }
+  }
+
+  Future<void> _forgetPassword() async {
+    try {
+      await _vault.delete(key: 'password').timeout(_vaultWait);
+    } catch (_) {}
+    await _prefs?.remove('password');
+  }
   bool loaded = false;
   String server = '';
   String user = '';
@@ -125,7 +161,7 @@ class Session extends ChangeNotifier {
     settings.addListener(notifyListeners);
     server = _prefs!.getString('server') ?? '';
     user = _prefs!.getString('user') ?? '';
-    _password = _prefs!.getString('password') ?? '';
+    _password = await _readPassword();
     if (server.isNotEmpty && user.isNotEmpty && _password.isNotEmpty) {
       try {
         await _enter(server, user, _password, verify: false);
@@ -150,7 +186,7 @@ class Session extends ChangeNotifier {
     await _prefs!.setString('server', s);
     await _prefs!.setString('user', userInput.trim());
     await _prefs!.setString('cacheUser', userInput.trim());
-    await _prefs!.setString('password', password);
+    await _savePassword(password);
     server = s;
     user = userInput.trim();
     _password = password;
@@ -227,7 +263,7 @@ class Session extends ChangeNotifier {
     services = null;
     offlineMode = false;
     _password = '';
-    await _prefs?.remove('password');
+    await _forgetPassword();
     await _prefs?.remove('offlineMode');
     notifyListeners();
   }
