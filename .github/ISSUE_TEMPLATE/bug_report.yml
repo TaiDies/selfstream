@@ -1,0 +1,22 @@
+name: Bug report
+description: Something does not work
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations: {required: true}
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    id: device
+    attributes:
+      label: Device (Windows 11, Pixel 8 / Android 15, Android Auto, ...)
+  - type: textarea
+    id: diag
+    attributes:
+      label: Diagnostic info
+      description: In the app open Settings, tap "Copy diagnostic info" and paste it here. It contains no passwords.
+      render: text

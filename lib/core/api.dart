@@ -130,6 +130,14 @@ class Api {
     }
   }
 
+  /// The last few failures (no passwords, no query strings), for the diagnostic info in Settings.
+  static final List<String> recentErrors = <String>[];
+
+  static void noteError(String what) {
+    recentErrors.add('${DateTime.now().toIso8601String().substring(0, 19)}  $what');
+    if (recentErrors.length > 15) recentErrors.removeAt(0);
+  }
+
   final String server;
   String user;
   String password;
@@ -383,6 +391,7 @@ class Api {
     final decoded = _decode(res);
     if (res.statusCode == 401 && path != 'ping') unawaited(verifyLogin()); // maybe the account was changed: check for sure
     if (res.statusCode >= 400) {
+      noteError('$method /$path: ${res.statusCode}');
       throw ApiException('${decoded['error'] ?? 'Request failed (${res.statusCode})'}', status: res.statusCode);
     }
     final emptyDiscover = path == 'discover' && (decoded['songs'] as List? ?? []).isEmpty;
@@ -502,6 +511,7 @@ class Api {
       rethrow;
     } catch (e) {
       _markServerDown();
+      noteError('${method.toUpperCase()} ${uri.path}: ${e.runtimeType}');
       throw ApiException('Cannot reach the server ($e)');
     }
   }

@@ -13,6 +13,7 @@ import '../state/offline.dart';
 import '../state/presence.dart';
 import '../state/session.dart';
 import '../state/background_setup.dart';
+import '../state/caps_holder.dart';
 import '../state/settings.dart';
 import '../state/updater.dart';
 import 'download_controls.dart';
@@ -237,6 +238,15 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Change username or password'),
             subtitle: Text('Your Navidrome login (${session.user})'),
             onTap: () => showDialog<void>(context: context, builder: (_) => ChangeAccountDialog(session: session)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Copy diagnostic info'),
+            subtitle: const Text('For bug reports. Contains no passwords and no full server address'),
+            onTap: () async {
+              await Clipboard.setData(ClipboardData(text: _diagnostics(context, session)));
+              if (context.mounted) context.toast('Copied. Paste it into your bug report');
+            },
           ),
           ListTile(
             leading: const Icon(Icons.logout),
@@ -602,4 +612,24 @@ class _ChangeAccountDialogState extends State<ChangeAccountDialog> {
       ],
     );
   }
+}
+
+String _diagnostics(BuildContext context, Session session) {
+  final caps = context.read<CapsHolder>();
+  var host = '(unknown)';
+  try {
+    final u = Uri.parse(session.server);
+    host = '${u.scheme}://${u.host.isEmpty ? '?' : u.host}';
+  } catch (_) {}
+  final errors = Api.recentErrors;
+  return [
+    'Selfstream 0.3 (build ${kBuildNumber == 0 ? 'local' : kBuildNumber})',
+    'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+    'Server: $host (path and port left out)',
+    'Selfstream server: ${caps.value.fromServer ? 'yes, "${caps.value.name}"' : 'no (plain Subsonic/Navidrome)'}',
+    'Features: ${caps.value.features.isEmpty ? '-' : (caps.value.features.toList()..sort()).join(', ')}',
+    'Offline mode: ${session.offlineMode}',
+    'Recent errors:',
+    if (errors.isEmpty) '  none' else ...errors.map((e) => '  $e'),
+  ].join('\n');
 }
