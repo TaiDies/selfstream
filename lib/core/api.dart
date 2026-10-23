@@ -436,6 +436,14 @@ class Api {
   Future<void> reorderPlaylist(String id, List<int> itemIds) =>
       _v1Call('PUT', 'playlists/$id/order', body: {'itemIds': itemIds});
 
+  /// Asks a selfstream server to look up the audio of upcoming cloud songs now, so they start faster. Never throws.
+  Future<void> prefetch(List<String> songIds) async {
+    if (songIds.isEmpty) return;
+    try {
+      await _send('POST', _uri('${_v1}prefetch', const {}), body: {'ids': songIds}, timeout: const Duration(seconds: 8));
+    } catch (_) {}
+  }
+
   Future<void> reportPlay(Map<String, dynamic> play) => _v1Call('POST', 'plays', body: play);
 
   Future<void> reportPlays(List<Map<String, dynamic>> plays) => _v1Call('POST', 'plays/batch', body: {'plays': plays});

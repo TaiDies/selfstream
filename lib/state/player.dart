@@ -372,6 +372,7 @@ class PlayerController extends ChangeNotifier {
     unawaited(_endTrack().then((_) {
       index = newIndex;
       _beginTrack(current);
+      _warmUpcoming();
       notifyListeners();
       _scheduleSave();
     }));
@@ -380,6 +381,16 @@ class PlayerController extends ChangeNotifier {
       player.pause();
       player.seek(Duration.zero);
     }
+  }
+
+  /// Tells the server about the next cloud songs in the queue so it can look their audio up before they play.
+  void _warmUpcoming() {
+    if (index < 0) return;
+    final ids = <String>[
+      for (var i = index + 1; i < queue.length && i <= index + 2; i++)
+        if (queue[i].isCloud && offline.pathForSong(queue[i]) == null) queue[i].id,
+    ];
+    if (ids.isNotEmpty) unawaited(api.prefetch(ids));
   }
 
   void _onState(PlayerState state) {
