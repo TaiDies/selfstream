@@ -25,9 +25,7 @@ HOW TO TEST
    Settings > Appearance, the mini player (button in the side bar) and keep-on-top.
 4. Offline: on an album or playlist choose the download option to save songs on the device. After
    Settings > Sign out, "Use offline mode" on the sign-in screen opens what was saved, without a network.
-5. Settings > "Change username or password" changes the user's own login on their server; the app then signs out
-   and the user signs in with the new details. Please do not use it on the demo account.
-6. The app only sends requests to the server address entered on the sign-in screen. The password is sent as a
+5. The app only sends requests to the server address entered on the sign-in screen. The password is sent as a
    salted hash (Subsonic token authentication), never as plain text, and is stored on the device in the Windows
    credential store.
 

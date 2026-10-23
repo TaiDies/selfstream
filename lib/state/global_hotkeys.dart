@@ -100,7 +100,7 @@ class GlobalHotkeyService {
   /// True while the user is pressing keys to pick a new shortcut: nothing should fire then.
   static bool capturing = false;
 
-  String _applied = '';
+  String? _applied; // null = nothing registered yet (the saved text is '' when the defaults are used, so it can't start as '')
   bool _busy = false;
   bool _again = false;
 
@@ -133,7 +133,7 @@ class GlobalHotkeyService {
       } while (_again);
     } catch (e) {
       if (kDebugMode) debugPrint('global hotkeys: $e');
-      _applied = '';
+      _applied = null;
     } finally {
       _busy = false;
     }

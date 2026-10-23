@@ -233,12 +233,13 @@ class SettingsScreen extends StatelessWidget {
             },
           )
         else ...[
-          ListTile(
-            leading: const Icon(Icons.manage_accounts_outlined),
-            title: const Text('Change username or password'),
-            subtitle: Text('Your Navidrome login (${session.user})'),
-            onTap: () => showDialog<void>(context: context, builder: (_) => ChangeAccountDialog(session: session)),
-          ),
+          if (context.watch<CapsHolder>().value.fromServer)
+            ListTile(
+              leading: const Icon(Icons.manage_accounts_outlined),
+              title: const Text('Change username or password'),
+              subtitle: Text('Your Navidrome login (${session.user})'),
+              onTap: () => showDialog<void>(context: context, builder: (_) => ChangeAccountDialog(session: session)),
+            ),
           ListTile(
             leading: const Icon(Icons.bug_report_outlined),
             title: const Text('Copy diagnostic info'),
