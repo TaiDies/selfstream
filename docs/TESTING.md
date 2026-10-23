@@ -4,7 +4,7 @@ CI only proves the code compiles and the unit tests pass. These need a real devi
 Tick them off before a release; "Copy diagnostic info" in Settings helps when something fails.
 
 ## Server
-- [ ] Clean Proxmox install from the one-line command, then open `/selfstream` and sign in as the Navidrome admin
+- [ ] Clean install of your server, then sign in from the app
 - [ ] `update` on an existing server keeps music, accounts and `selfstream.db`
 - [ ] Docker install on x86 starts and the app can sign in
 - [ ] Admin page: accounts list, rename, transfer saved data, lost-data list

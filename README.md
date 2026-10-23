@@ -24,16 +24,17 @@ The app contains no music and no music sources. What you can play depends entire
 
 ## Before you start
 
-Selfstream is a client for a server **you run yourself** (Navidrome plus the
-[selfstream server](https://github.com/TaiDies/selfstream-server)). There is no hosted service and no account with us.
+Selfstream is a client for a music server **you run yourself**: any Subsonic-compatible server such as Navidrome.
+There is no hosted service and no account with us. Optionally, a custom Selfstream server can sit in front of
+Navidrome to manage extra features (playlists, follows, Discover, activity and more); without one the app works as a
+plain music player.
 
-1. Install the server (one command on Proxmox, or Docker on x86).
-2. Install the app and sign in with your Navidrome username and password.
+1. Set up your music server.
+2. Install the app and sign in with your server address and login.
 
-Please read this: you are responsible for the server you run and for the music you put on it. YouTube search and
-download use yt-dlp, which can break without notice when YouTube changes, and may be restricted by YouTube's terms or
-the law where you live. Only download what you have the right to. The software is provided as is, without warranty.
-If something breaks, Settings has a "Copy diagnostic info" button to paste into a bug report.
+Please read this: you are responsible for the server you run and for the music you put on it. Only use music you have
+the right to. The software is provided as is, without warranty. If something breaks, Settings has a
+"Copy diagnostic info" button to paste into a bug report.
 
 ## Install
 
