@@ -13,6 +13,7 @@ import 'library.dart';
 import '../platform/platform.dart';
 import 'audio_handler.dart';
 import 'offline.dart';
+import 'queue_cache.dart';
 import 'settings.dart';
 
 /// Playback, the queue, listening reports, sleep timer and "continue where you left off" across devices.
@@ -25,6 +26,7 @@ class PlayerController extends ChangeNotifier {
     _subs.add(player.shuffleModeEnabledStream.listen((_) => notifyListeners()));
     _subs.add(player.loopModeStream.listen((_) => notifyListeners()));
     _subs.add(player.speedStream.listen((_) => notifyListeners()));
+    _watchdog = Timer.periodic(const Duration(seconds: 2), (_) => _checkStall());
     if (!isDesktop) SelfstreamAudio.handler?.attach(this);
     if (isDesktop) {
       player.setVolume(settings.volume);
@@ -42,6 +44,11 @@ class PlayerController extends ChangeNotifier {
   final Library library;
   final OfflineStore offline;
   final Settings settings;
+  late final QueueCache _cache = QueueCache(api: api, settings: settings);
+  bool _swapping = false;
+  bool _wantPlaying = false;
+  DateTime _changedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _userPausedAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Does the connected server offer this feature? (set by the session once it knows)
   bool Function(String) has = (_) => false;
@@ -110,7 +117,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   AudioSource _sourceFor(Song s) {
-    final path = offline.pathForSong(s);
+    final path = offline.pathForSong(s) ?? _cache.pathFor(s);
     final uri = path != null ? Uri.file(path) : api.streamUri(s.id, maxBitRate: settings.maxBitRate);
     return AudioSource.uri(uri);
   }
@@ -178,6 +185,7 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> toggle() async {
     if (player.playing) {
+      _userPausedAt = DateTime.now();
       await player.pause();
     } else {
       unawaited(player.play());
@@ -201,6 +209,7 @@ class PlayerController extends ChangeNotifier {
   Future<void> toggleShuffle() async {
     await player.setShuffleModeEnabled(!player.shuffleModeEnabled);
     if (player.shuffleModeEnabled) await _reshuffle();
+    _warmUpcoming();
     _scheduleSave();
   }
 
@@ -222,6 +231,7 @@ class PlayerController extends ChangeNotifier {
     queue.add(s);
     await _warmCovers([s]);
     await _source!.add(_sourceFor(s));
+    _warmUpcoming();
     notifyListeners();
     _scheduleSave();
   }
@@ -232,6 +242,7 @@ class PlayerController extends ChangeNotifier {
     queue.insert(at, s);
     await _warmCovers([s]);
     await _source!.insert(at, _sourceFor(s));
+    _warmUpcoming();
     notifyListeners();
     _scheduleSave();
   }
@@ -246,6 +257,7 @@ class PlayerController extends ChangeNotifier {
     if (i < 0 || i >= queue.length || _source == null) return;
     queue.removeAt(i);
     await _source!.removeAt(i);
+    _warmUpcoming();
     if (queue.isEmpty) {
       index = -1;
       await player.stop();
@@ -260,6 +272,7 @@ class PlayerController extends ChangeNotifier {
     final s = queue.removeAt(oldIndex);
     queue.insert(newIndex, s);
     await _source!.move(oldIndex, newIndex);
+    _warmUpcoming();
     notifyListeners();
     _scheduleSave();
   }
@@ -366,11 +379,13 @@ class PlayerController extends ChangeNotifier {
 
   // ------------------------------------------------------------- events
   void _onIndex(int? i) {
+    if (_swapping) return; // swapping a queued song for its saved file moves the index for a moment
     final newIndex = i ?? -1;
     if (newIndex == index && _tSong != null) return;
     final wasEnd = sleepAtTrackEnd;
     unawaited(_endTrack().then((_) {
       index = newIndex;
+      _changedAt = DateTime.now();
       _beginTrack(current);
       _warmUpcoming();
       notifyListeners();
@@ -383,17 +398,126 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
-  /// Tells the server about the next cloud songs in the queue so it can look their audio up before they play.
+  // ------------------------------------------------------ stall recovery
+  // A streamed song sometimes sits there "playing" without sound until you pause and resume it. This does that for you.
+  Timer? _watchdog;
+  DateTime? _stuckSince;
+  Duration _stallPos = Duration.zero;
+  String? _recoverySong;
+  int _recoveries = 0;
+  bool _recovering = false;
+
+  void _checkStall() {
+    if (_disposed || _recovering) return;
+    final st = player.processingState;
+    final sinceChange = DateTime.now().difference(_changedAt);
+    // the next song was loaded but playback dropped to "paused" on its own: carry on playing it
+    if (_wantPlaying && !player.playing && sinceChange < const Duration(seconds: 8) && _userPausedAt.isBefore(_changedAt) && st != ProcessingState.completed && index >= 0) {
+      Api.noteError('playback stopped at a song change, resumed');
+      unawaited(player.play());
+      return;
+    }
+    final waiting = st == ProcessingState.loading || st == ProcessingState.buffering;
+    final frozen = st == ProcessingState.ready && player.position == _stallPos;
+    _stallPos = player.position;
+    if (!player.playing || st == ProcessingState.idle || st == ProcessingState.completed || !(waiting || frozen)) {
+      _stuckSince = null;
+      if (st == ProcessingState.ready && player.playing && !frozen) _recoveries = 0;
+      return;
+    }
+    _stuckSince ??= DateTime.now();
+    // right after a song change a stuck player is fixed sooner than one that stalls in the middle of a song
+    if (DateTime.now().difference(_stuckSince!) < (sinceChange < const Duration(seconds: 12) ? const Duration(seconds: 3) : const Duration(seconds: 8))) return;
+    _stuckSince = DateTime.now();
+    unawaited(_recover());
+  }
+
+  Future<void> _recover() async {
+    final song = current;
+    if (song == null || _source == null) return;
+    if (_recoverySong != song.id) {
+      _recoverySong = song.id;
+      _recoveries = 0;
+    }
+    if (_recoveries >= 3) return; // give up on this song; skipping or an error message is the user's call
+    _recoveries++;
+    _recovering = true;
+    Api.noteError('playback stalled on a song, recovery attempt $_recoveries');
+    try {
+      final pos = player.position;
+      if (_recoveries == 1) {
+        await player.pause();
+        unawaited(player.play());
+      } else if (_recoveries == 2) {
+        await player.seek(pos);
+      } else {
+        await player.setAudioSource(_source!, initialIndex: index, initialPosition: pos);
+        unawaited(player.play());
+      }
+    } catch (_) {
+    } finally {
+      _recovering = false;
+    }
+  }
+
+  /// The queue positions that play after the current song, in playing order (follows shuffle).
+  List<int> _upcomingIndices(int n) {
+    if (index < 0 || queue.isEmpty) return const [];
+    List<int> order = List<int>.generate(queue.length, (i) => i);
+    if (player.shuffleModeEnabled) {
+      final eff = player.effectiveIndices;
+      if (eff != null && eff.length == queue.length) order = eff;
+    }
+    final at = order.indexOf(index);
+    if (at < 0) return const [];
+    final out = <int>[];
+    for (var k = 1; k <= n; k++) {
+      var p = at + k;
+      if (p >= order.length) {
+        if (player.loopMode != LoopMode.all) break;
+        p %= order.length;
+      }
+      if (order[p] != index) out.add(order[p]);
+    }
+    return out;
+  }
+
+  /// Keeps the next 4 songs of the queue saved on this device (and the server warmed up for cloud songs),
+  /// so they start without a wait and still play if the connection drops.
   void _warmUpcoming() {
-    if (index < 0) return;
-    final ids = <String>[
-      for (var i = index + 1; i < queue.length && i <= index + 2; i++)
-        if (queue[i].isCloud && offline.pathForSong(queue[i]) == null) queue[i].id,
-    ];
-    if (ids.isNotEmpty) unawaited(api.prefetch(ids));
+    if (_disposed || index < 0) return;
+    final next = [for (final i in _upcomingIndices(4)) queue[i]].where((s) => offline.pathForSong(s) == null).toList();
+    final cloud = [for (final s in next) if (s.isCloud && _cache.pathFor(s) == null) s.id];
+    if (cloud.isNotEmpty) unawaited(api.prefetch(cloud));
+    if (api.offline) return;
+    final keep = <String>{if (current != null) current!.id};
+    unawaited(_cache.fill(next, keep: keep, onReady: _swapIn));
+  }
+
+  /// A queued song has been saved: let the player use the file instead of the stream.
+  Future<void> _swapIn(Song s, String path) async {
+    final src = _source;
+    if (src == null || _disposed) return;
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i].id != s.id || i == index) continue;
+      _swapping = true;
+      try {
+        await src.removeAt(i);
+        await src.insert(i, AudioSource.uri(Uri.file(path)));
+      } catch (_) {
+        // the song then simply plays from the stream
+      } finally {
+        _swapping = false;
+      }
+    }
   }
 
   void _onState(PlayerState state) {
+    if (state.playing) {
+      _wantPlaying = true;
+    } else if (DateTime.now().difference(_changedAt) > const Duration(seconds: 4)) {
+      _wantPlaying = false; // paused for real, not dropped by a song change
+    }
     if (state.playing && _tSong == null && current != null) _beginTrack(current);
     if (state.processingState == ProcessingState.completed) {
       unawaited(_endTrack());
@@ -492,6 +616,8 @@ class PlayerController extends ChangeNotifier {
     if (!isDesktop) SelfstreamAudio.handler?.detach(this);
     _saveTimer?.cancel();
     _sleepTimer?.cancel();
+    _watchdog?.cancel();
+    _cache.dispose();
     for (final s in _subs) {
       s.cancel();
     }
