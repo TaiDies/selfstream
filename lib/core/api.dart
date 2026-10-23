@@ -449,7 +449,10 @@ class Api {
   /// What this server offers. A server that is not selfstream answers 404: then only the plain player parts are used.
   Future<Capabilities> capabilities() async {
     try {
-      return Capabilities.fromJson(await v1Get('manifest'));
+      final m = await v1Get('manifest');
+      // a plain Navidrome may answer with its web page (an empty result) instead of 404: that is not a selfstream server
+      if (m['features'] is! List && m['tabs'] is! List) return Capabilities.generic;
+      return Capabilities.fromJson(m);
     } on ApiException catch (e) {
       if (e.status == 0) rethrow; // not reachable and nothing saved: the caller decides
       return Capabilities.generic;
