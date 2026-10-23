@@ -6,6 +6,7 @@ It does not contain any music and it does not provide a server or an account. On
 screen asking for the address of the user's own server, a user name and a password. That is why the app looks
 empty until it is connected to a server that already holds music: every user adds their own music files to their
 own Navidrome server (copying their own music into the server's music folder), and the app plays it.
+The Store version is a plain Subsonic/Navidrome player. It has no YouTube or other download features.
 
 To make testing possible we run a plain, unmodified Navidrome server with a small demo library. The demo tracks
 were synthesized from scratch for this purpose (no recordings, no samples, CC0), so nothing is copyrighted.
@@ -15,14 +16,21 @@ HOW TO TEST
      Server:    <SERVER URL, e.g. https://demo.example.com>
      User name: <USERNAME>
      Password:  <PASSWORD>
+   (Addresses are https by default. A plain http address shows a warning, which is expected.)
 2. After signing in you will see Home, Search and Library. The library has 3 albums by 3 demo artists
-   (9 short tracks). Tap any album or track to play it.
+   (9 short tracks). Click any album or track to play it.
 3. Things worth trying: play / pause / next / previous / seek, the volume slider, shuffle and repeat, the queue,
    Search (type "demo" or "sample"), liking a song (Library > Liked), creating a playlist from the song menu,
    the synced-lyrics view in Now Playing (demo tracks have no lyrics, so it says none are available),
-   Settings > Theme, the mini player (button in the side bar) and keep-on-top.
-4. The app only sends requests to the server address entered on the sign-in screen. The password is sent as a
-   salted hash (Subsonic token authentication), never as plain text.
+   Settings > Appearance, the mini player (button in the side bar) and keep-on-top.
+4. Offline: on an album or playlist choose the download option to save songs on the device. After
+   Settings > Sign out, "Use offline mode" on the sign-in screen opens what was saved, without a network.
+5. Settings > "Change username or password" changes the user's own login on their server; the app then signs out
+   and the user signs in with the new details. Please do not use it on the demo account.
+6. The app only sends requests to the server address entered on the sign-in screen. The password is sent as a
+   salted hash (Subsonic token authentication), never as plain text, and is stored on the device in the Windows
+   credential store.
 
-The sign-in is not a Microsoft/Store account and the app has no in-app purchases, ads or accounts of its own.
+The sign-in is not a Microsoft/Store account and the app has no in-app purchases, ads, tracking or accounts of its
+own. Privacy policy: https://<YOUR-WEBSITE>/privacy
 The demo server is provided only for certification; please do not change or delete the demo account.
