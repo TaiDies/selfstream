@@ -13,6 +13,15 @@ shows the extra tabs, screens and features that the server describes.
 
 The app contains no music and no music sources. What you can play depends entirely on the server you sign in to.
 
+## Screenshots
+
+![Home on Windows](website/img/windows-home.webp)
+![Search on Windows](website/img/windows-search.webp)
+
+<p>
+<img src="website/img/android-home.webp" width="19%"> <img src="website/img/android-player.webp" width="19%"> <img src="website/img/android-library.webp" width="19%"> <img src="website/img/android-lyrics.webp" width="19%"> <img src="website/img/android-activity.webp" width="19%">
+</p>
+
 ## Before you start
 
 Selfstream is a client for a server **you run yourself** (Navidrome plus the
