@@ -204,10 +204,16 @@ class SelfstreamHandler extends BaseAudioHandler with SeekHandler {
   Future<void> prepareFromMediaId(String mediaId, [Map<String, dynamic>? extras]) async {}
 
   @override
-  Future<void> pause() async => _c?.player.pause();
+  Future<void> pause() async {
+    _c?.markUserPause();
+    await _c?.player.pause();
+  }
 
   @override
-  Future<void> stop() async => _c?.player.pause();
+  Future<void> stop() async {
+    _c?.markUserPause();
+    await _c?.player.pause();
+  }
 
   @override
   Future<void> skipToNext() async => _c?.next();

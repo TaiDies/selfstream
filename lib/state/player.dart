@@ -46,6 +46,9 @@ class PlayerController extends ChangeNotifier {
   final Settings settings;
   late final QueueCache _cache = QueueCache(api: api, settings: settings);
   bool _swapping = false;
+
+  /// Call when playback is paused on purpose (button, notification, sleep timer).
+  void markUserPause() => _userPausedAt = DateTime.now();
   bool _wantPlaying = false;
   DateTime _changedAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _userPausedAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -138,6 +141,9 @@ class PlayerController extends ChangeNotifier {
       return playSongs(playable, start: at < 0 ? 0 : at, shuffle: shuffle, checked: true);
     }
     await _endTrack();
+    _wantPlaying = true; // you asked for playback: if it does not start by itself the watchdog gets it going
+    _changedAt = DateTime.now();
+    _userPausedAt = DateTime.fromMillisecondsSinceEpoch(0);
     queue = List<Song>.of(songs);
     var first = start.clamp(0, queue.length - 1);
     if (shuffle) first = Random().nextInt(queue.length);
@@ -393,6 +399,7 @@ class PlayerController extends ChangeNotifier {
     }));
     if (wasEnd) {
       sleepAtTrackEnd = false;
+      markUserPause();
       player.pause();
       player.seek(Duration.zero);
     }
@@ -417,6 +424,15 @@ class PlayerController extends ChangeNotifier {
       unawaited(player.play());
       return;
     }
+    // the back end gave up on the song (it reports "idle") although you want it playing: load it again
+    if (st == ProcessingState.idle && _wantPlaying && index >= 0 && queue.isNotEmpty && sinceChange > const Duration(seconds: 3) && _userPausedAt.isBefore(_changedAt)) {
+      _stuckSince ??= DateTime.now();
+      if (DateTime.now().difference(_stuckSince!) > const Duration(seconds: 3)) {
+        _stuckSince = DateTime.now();
+        unawaited(_recover(stage: 3));
+      }
+      return;
+    }
     final waiting = st == ProcessingState.loading || st == ProcessingState.buffering;
     final frozen = st == ProcessingState.ready && player.position == _stallPos;
     _stallPos = player.position;
@@ -432,33 +448,46 @@ class PlayerController extends ChangeNotifier {
     unawaited(_recover());
   }
 
-  Future<void> _recover() async {
+  Future<void> _recover({int? stage}) async {
     final song = current;
     if (song == null || _source == null) return;
     if (_recoverySong != song.id) {
       _recoverySong = song.id;
       _recoveries = 0;
     }
-    if (_recoveries >= 3) return; // give up on this song; skipping or an error message is the user's call
+    if (_recoveries >= 3) {
+      if (_giveUpAt == null || DateTime.now().difference(_giveUpAt!) < const Duration(seconds: 30)) {
+        _giveUpAt ??= DateTime.now();
+        return; // wait a while, then run through the steps once more
+      }
+      _recoveries = 0;
+    }
+    _giveUpAt = null;
     _recoveries++;
+    final step = stage ?? _recoveries;
     _recovering = true;
-    Api.noteError('playback stalled on a song, recovery attempt $_recoveries');
+    Api.noteError('playback stalled on a song, recovery step $step');
     try {
       final pos = player.position;
-      if (_recoveries == 1) {
-        await player.pause();
-        unawaited(player.play());
-      } else if (_recoveries == 2) {
-        await player.seek(pos);
+      if (step == 1) {
+        // what you do by hand: pause, a moment, play (without waiting for the back end to answer)
+        unawaited(player.pause().catchError((Object _) {}));
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        unawaited(player.play().catchError((Object _) {}));
+      } else if (step == 2) {
+        await player.seek(pos).timeout(const Duration(seconds: 4));
+        unawaited(player.play().catchError((Object _) {}));
       } else {
-        await player.setAudioSource(_source!, initialIndex: index, initialPosition: pos);
-        unawaited(player.play());
+        await player.setAudioSource(_source!, initialIndex: index, initialPosition: pos).timeout(const Duration(seconds: 15));
+        unawaited(player.play().catchError((Object _) {}));
       }
     } catch (_) {
     } finally {
       _recovering = false;
     }
   }
+
+  DateTime? _giveUpAt;
 
   /// The queue positions that play after the current song, in playing order (follows shuffle).
   List<int> _upcomingIndices(int n) {
@@ -515,8 +544,8 @@ class PlayerController extends ChangeNotifier {
   void _onState(PlayerState state) {
     if (state.playing) {
       _wantPlaying = true;
-    } else if (DateTime.now().difference(_changedAt) > const Duration(seconds: 4)) {
-      _wantPlaying = false; // paused for real, not dropped by a song change
+    } else if (!_userPausedAt.isBefore(_changedAt)) {
+      _wantPlaying = false; // paused by you (or the sleep timer), not dropped by a song change
     }
     if (state.playing && _tSong == null && current != null) _beginTrack(current);
     if (state.processingState == ProcessingState.completed) {

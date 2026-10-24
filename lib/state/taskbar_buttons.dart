@@ -53,8 +53,7 @@ class TaskbarButtons {
           playing ? 'Pause' : 'Play',
           () {
             if (player.current == null) return;
-            final p = player.player;
-            unawaited(p.playing ? p.pause() : p.play());
+            unawaited(player.toggle());
           },
         ),
         ThumbnailToolbarButton(ThumbnailToolbarAssetIcon('assets/taskbar/next.ico'), 'Next', () {
