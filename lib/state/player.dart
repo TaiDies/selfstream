@@ -425,9 +425,9 @@ class PlayerController extends ChangeNotifier {
       return;
     }
     // the back end gave up on the song (it reports "idle") although you want it playing: load it again
-    if (st == ProcessingState.idle && _wantPlaying && index >= 0 && queue.isNotEmpty && sinceChange > const Duration(seconds: 3) && _userPausedAt.isBefore(_changedAt)) {
+    if (st == ProcessingState.idle && _wantPlaying && index >= 0 && queue.isNotEmpty && sinceChange > const Duration(seconds: 2) && _userPausedAt.isBefore(_changedAt)) {
       _stuckSince ??= DateTime.now();
-      if (DateTime.now().difference(_stuckSince!) > const Duration(seconds: 3)) {
+      if (DateTime.now().difference(_stuckSince!) > const Duration(seconds: 2)) {
         _stuckSince = DateTime.now();
         unawaited(_recover(stage: 3));
       }
@@ -438,7 +438,10 @@ class PlayerController extends ChangeNotifier {
     _stallPos = player.position;
     if (!player.playing || st == ProcessingState.idle || st == ProcessingState.completed || !(waiting || frozen)) {
       _stuckSince = null;
-      if (st == ProcessingState.ready && player.playing && !frozen) _recoveries = 0;
+      if (st == ProcessingState.ready && player.playing && !frozen) {
+        _recoveries = 0;
+        _errorRetrySong = null;
+      }
       return;
     }
     _stuckSince ??= DateTime.now();
@@ -554,7 +557,19 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? _errorRetrySong;
+
   void _onError(Object error, StackTrace st) {
+    Api.noteError('player error: ${_clean(error)}');
+    final song = current;
+    // a song that fails to load often works on the second try: load it again once before giving up on it
+    if (song != null && _source != null && _errorRetrySong != song.id) {
+      _errorRetrySong = song.id;
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 800)).then((_) {
+        if (!_disposed && current?.id == song.id) return _recover(stage: 3);
+      }));
+      return;
+    }
     _errors.add('Playback problem: ${_clean(error)}');
     if (player.hasNext) {
       player.seekToNext();
