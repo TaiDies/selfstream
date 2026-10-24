@@ -1,0 +1,13 @@
+Analyzing selfstream...                                         
+
+   info - Use an initializing formal to assign a parameter to a field - lib\core\api.dart:60:9 - prefer_initializing_formals
+   info - Use an initializing formal to assign a parameter to a field - lib\core\api.dart:61:9 - prefer_initializing_formals
+   info - The import of 'ui/palette.dart' is unnecessary because all of the used elements are also provided by the import of 'ui/widgets.dart' - lib\main.dart:21:8 - unnecessary_import
+   info - Statements in an if should be enclosed in a block - lib\ui\library_screen.dart:187:20 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\ui\library_screen.dart:193:20 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\ui\library_screen.dart:256:20 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\ui\library_screen.dart:262:20 - curly_braces_in_flow_control_structures
+   info - Angle brackets will be interpreted as HTML - lib\ui\shell.dart:212:69 - unintended_html_in_doc_comment
+   info - The import of 'palette.dart' is unnecessary because all of the used elements are also provided by the import of 'widgets.dart' - lib\ui\theme_editor.dart:12:8 - unnecessary_import
+
+9 issues found. (ran in 16.5s)
