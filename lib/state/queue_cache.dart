@@ -43,6 +43,12 @@ class QueueCache {
     return _dir;
   }
 
+  /// Stops everything in progress (partly saved files are dropped); songs already saved stay.
+  void cancelAll() {
+    _gen++;
+    _wanted = {};
+  }
+
   /// Saves [want] one after the other, in order; calls [onReady] as each one is complete.
   /// Files for songs that are neither in [want] nor in [keep] are deleted.
   Future<void> fill(List<Song> want, {Set<String> keep = const {}, required void Function(Song, String) onReady}) async {

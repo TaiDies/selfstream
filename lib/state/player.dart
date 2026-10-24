@@ -336,6 +336,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   void _onPosition(Duration p) {
+    if (_warmPending) _maybeStartWarming();
     final s = _tSong;
     if (s == null) return;
     if (player.playing) {
@@ -514,10 +515,23 @@ class PlayerController extends ChangeNotifier {
     return out;
   }
 
-  /// Keeps the next 4 songs of the queue saved on this device (and the server warmed up for cloud songs),
-  /// so they start without a wait and still play if the connection drops.
+  bool _warmPending = false;
+
+  /// The next 4 songs are only fetched once the current song is really playing, so they never compete with it
+  /// for the connection. A skip stops whatever was being fetched; the new current song loads first.
   void _warmUpcoming() {
     if (_disposed || index < 0) return;
+    _cache.cancelAll();
+    _warmPending = true;
+    _maybeStartWarming();
+  }
+
+  void _maybeStartWarming() {
+    if (!_warmPending || _disposed || index < 0) return;
+    final loaded = player.playing && player.processingState == ProcessingState.ready && player.position > const Duration(seconds: 1);
+    final local = current != null && (offline.pathForSong(current!) != null || _cache.pathFor(current!) != null);
+    if (!loaded && !(local && player.processingState == ProcessingState.ready)) return;
+    _warmPending = false;
     final next = [for (final i in _upcomingIndices(4)) queue[i]].where((s) => offline.pathForSong(s) == null).toList();
     final cloud = [for (final s in next) if (s.isCloud && _cache.pathFor(s) == null) s.id];
     if (cloud.isNotEmpty) unawaited(api.prefetch(cloud));
